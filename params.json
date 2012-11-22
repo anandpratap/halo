@@ -1,1 +1,1 @@
-{"note":"Don't delete this file! It's used internally to help with page regeneration.","google":"","name":"Halo","tagline":"Ideal MHD Solver","body":"halo\r\n====\r\n\r\nIdeal MHD Solver"}
+{"note":"Don't delete this file! It's used internally to help with page regeneration.","body":"halo\r\n====\r\n\r\nIdeal MHD Solver\r\n\r\n```python\r\ndef func(x):\r\n    return x*x\r\n````","tagline":"Ideal MHD Solver","name":"Halo","google":""}
