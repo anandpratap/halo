@@ -1,4 +1,4 @@
-halo
+Halo
 ====
 
-Ideal MHD Solver
+## Ideal MHD Solver ##
