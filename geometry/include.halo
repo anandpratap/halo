@@ -1,0 +1,6 @@
+#ifndef GEOMETRY_INCLUDE_HALO
+#define GEOMETRY_INCLUDE_HALO
+
+#include "base.halo"
+
+#endif

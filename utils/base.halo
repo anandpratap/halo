@@ -1,0 +1,6 @@
+#ifndef UTILS_BASE_HALO
+#define UTILS_BASE_HALO
+
+#define double state [10];
+
+#endif

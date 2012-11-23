@@ -1,0 +1,48 @@
+#ifndef GEOMETRY_BASE_HALO
+#define GEOMETRY_BASE_HALO
+//include utils
+#include "../utils/include.halo"
+
+#define max_nx 500
+#define max_ny 500
+//maximum number of cell the code can handle at this point a 500x500
+//you will need to hard code the above values to change this behaviour
+//
+//        |-------|-------|-------|
+//        |       |       |       |
+//        |i-1,j+1| i,j+1 |i+1,j+1|
+//        |       |       |       |
+//        |-------|-------|-------|
+//        |       |       |       |
+//        | i-1,j |  i,j  | i+1,j |
+//        |       |       |       |
+//        |-------|-------|-------|
+//        |       |       |       |
+//        |i-1,j-1| i,j-1 |i+1,j-1|
+//        |       |       |       |
+//        |-------|-------|-------|
+//
+//[i,j]th cell will exchange fluxes with [i,j-1], [i+1,j], [i,j+1], [i-1,j]
+//starting from bottom and moving in counter clockwise direction
+//we will use them in this sequence wherever required
+//
+//[i,j]th cell will have corner points given by index [i,j], [i+1,j], [i+1,j+1], [i,j+1]
+//starting from left bottom in counter clockwise direction
+//we wil preserve the same sequence, werever required
+class Geometry{
+public:
+  //initializing variable corresponding to x, y coordiated for cell and corner points
+  double xc[max_nx] = {};
+  double yc[max_ny] = {};
+  double x[max_nx+1] = {};
+  double y[max_ny+1] = {};
+  
+  //state properties of cell
+  //Euler in 2D uses only 4 while ideal MHD uses 8
+  double state[max_nx] = {};
+  
+}; 
+ 
+
+
+#endif
