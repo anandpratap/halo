@@ -1,10 +1,12 @@
 #ifndef GEOMETRY_BASE_HALO
 #define GEOMETRY_BASE_HALO
 //include utils
-#include "../utils/include.halo"
-
-#define max_nx 500
-#define max_ny 500
+#include "../utils/base.halo"
+#include <fstream>
+#include <iostream>
+#define max_nx 200
+#define max_ny 200
+#define default_l 1.0
 //maximum number of cell the code can handle at this point a 500x500
 //you will need to hard code the above values to change this behaviour
 //
@@ -29,20 +31,91 @@
 //[i,j]th cell will have corner points given by index [i,j], [i+1,j], [i+1,j+1], [i,j+1]
 //starting from left bottom in counter clockwise direction
 //we wil preserve the same sequence, werever required
-class Geometry{
+class Domain{
 public:
   //initializing variable corresponding to x, y coordiated for cell and corner points
-  double xc[max_nx];
-  double yc[max_ny];
-  double x[max_nx+1];
-  double y[max_ny+1];
-  
+  double xc[max_nx][max_ny] = {};
+  double yc[max_nx][max_ny] = {};
+  double x[max_nx+1][max_ny+1] = {};
+  double y[max_nx+1][max_ny+1] = {};
+  int Nx, Ny;
   //state properties of cell
   //Euler in 2D uses only 4 while ideal MHD uses 8
-  state cellstate[max_nx];
+  state cellstate[max_nx][max_ny] = {};
+  //for declaretion of state in utils/base.halo
+  //0 -> density
+  //1 -> u
+  //2 -> v
+  //3 -> w
+  //4 -> Bx
+  //5 -> By
+  //6 -> Bz
+  //7 -> p
+  //8,9 are redundant can be used in future for other purposes
   
+  //set the size of the domain
+  void set_size(int iNx, int iNy){Nx=iNx;Ny=iNy;}
+  //calc coordinates
+  void calc_coordinates(void);
+  void calc_centroid(void);
+  void init(void);
+  void write_file(void);
+  void setup(void);
 }; 
  
+
+//default calc coordinates makes a square domain of size 1
+void Domain::calc_coordinates(void){
+  double dx = default_l/Nx;
+  double dy = default_l/Ny;
+  for(int i=0;i<Nx+1;i++){
+    for(int j=0;j<Ny+1;j++){
+      x[i][j] = i*dx;
+      y[i][j] = j*dy;
+    }
+  }    
+}
+
+void Domain::calc_centroid(void){
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      xc[i][j] = 0.25*(x[i][j] + x[i+1][j] + x[i+1][j+1] + x[i][j+1]);
+      yc[i][j] = 0.25*(y[i][j] + y[i+1][j] + y[i+1][j+1] + y[i][j+1]);
+    }
+  }    
+}
+
+void Domain::init(void){
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      //density
+      cellstate[i][j][0] = 1.0;
+      //u
+      cellstate[i][j][1] = 1.0;
+      //p
+      cellstate[i][j][7] = 1.0;
+    }
+  }
+}
+
+void Domain::write_file(void){
+  std::ofstream grid("grid.dat");
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      grid<<x[i][j]<<" "<<y[i][j]<<"\n";
+    }
+  }
+  grid.close();
+}
+
+
+
+void Domain::setup(void){
+  calc_coordinates();
+  calc_centroid();
+  init();
+  write_file();
+}
 
 
 #endif
