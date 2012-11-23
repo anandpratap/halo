@@ -2,5 +2,6 @@
 #define GEOMETRY_INCLUDE_HALO
 
 #include "base.halo"
+#include "bluff.halo"
 
 #endif

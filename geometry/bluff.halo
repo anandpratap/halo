@@ -1,0 +1,29 @@
+#ifndef GEOMETRY_BLUFF_HALO
+#define GEOMETRY_BLUFF_HALO
+#include "base.halo"
+
+class Bluff: public Domain {
+public:
+  virtual void calc_coordinates(void) override;
+};
+void Bluff::calc_coordinates(void){
+  double deta, dxeta, eta, xeta, theta, Rx, Ry;
+  deta = default_l/Ny;
+  dxeta = default_l/Nx;
+  eta = 0.0;
+  xeta = 0.0;
+  theta = 5*pi/12.0;
+  Rx = 3.0;
+  Ry = 6.0;
+  for(int i=0;i<Nx+1;i++){
+    xeta = 0.0;
+    for(int j=0;j<Ny+1;j++){
+      xeta += dxeta;
+      x[i][j] = (Rx - (Rx-1)*xeta)*cos(theta*(2*eta-1));
+      y[i][j] = (Ry - (Ry-1)*xeta)*sin(theta*(2*eta-1));
+    }
+    eta += deta;
+  }    
+}
+
+#endif
