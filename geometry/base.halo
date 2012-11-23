@@ -4,9 +4,10 @@
 #include "../utils/base.halo"
 #include <fstream>
 #include <iostream>
-#define max_nx 200
-#define max_ny 200
+#define max_nx 100
+#define max_ny 100
 #define default_l 1.0
+#define pi 3.14
 //maximum number of cell the code can handle at this point a 500x500
 //you will need to hard code the above values to change this behaviour
 //
@@ -38,6 +39,12 @@ public:
   double yc[max_nx][max_ny] = {};
   double x[max_nx+1][max_ny+1] = {};
   double y[max_nx+1][max_ny+1] = {};
+  double nx[max_nx][max_ny][4] = {};
+  double ny[max_nx][max_ny][4] = {};
+  //!!!!!!!!!!!delete next two line, these are just for testing info
+  double xnx[max_nx][max_ny][4] = {};
+  double yny[max_nx][max_ny][4] = {};
+
   int Nx, Ny;
   //state properties of cell
   //Euler in 2D uses only 4 while ideal MHD uses 8
@@ -56,8 +63,9 @@ public:
   //set the size of the domain
   void set_size(int iNx, int iNy){Nx=iNx;Ny=iNy;}
   //calc coordinates
-  void calc_coordinates(void);
+  virtual void calc_coordinates(void);
   void calc_centroid(void);
+  void calc_normal(void);
   void init(void);
   void write_file(void);
   void setup(void);
@@ -85,11 +93,56 @@ void Domain::calc_centroid(void){
   }    
 }
 
+void Domain::calc_normal(void){
+  double tnx, tny, tn;
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      for(int k=0;k<4;k++){
+	if(k==0){
+	  tnx = (y[i+1][j] - y[i][j]);
+	  tny = -(x[i+1][j] - x[i][j]);
+	  //!!!!!!!!!!!delete next two line, these are just for testing info
+	  xnx[i][j][k] = x[i+1][j] + x[i][j];
+	  yny[i][j][k] = y[i+1][j] + y[i][j];
+	}
+	if(k==1){
+	  tnx = (y[i+1][j+1] - y[i+1][j]);
+	  tny = -(x[i+1][j+1] - x[i+1][j]);
+	  //!!!!!!!!!!!delete next two line, these are just for testing info
+	  xnx[i][j][k] = x[i+1][j+1] + x[i+1][j];
+	  yny[i][j][k] = y[i+1][j+1] + y[i+1][j];
+
+	}
+	if(k==2){
+	  tnx = (y[i][j+1] - y[i+1][j+1]);
+	  tny = -(x[i][j+1] - x[i+1][j+1]);
+	  //!!!!!!!!!!!delete next two line, these are just for testing info
+	  xnx[i][j][k] = x[i+1][j+1] + x[i][j+1];
+	  yny[i][j][k] = y[i+1][j+1] + y[i][j+1];
+	
+	}
+	if(k==3){
+	  tnx = (y[i][j] - y[i][j+1]);
+	  tny = -(x[i][j] - x[i][j+1]);
+	  //!!!!!!!!!!!delete next two line, these are just for testing info
+	  xnx[i][j][k] = x[i][j] + x[i][j+1];
+	  yny[i][j][k] = y[i][j] + y[i][j+1];
+	
+	}
+	tn = sqrt(tnx*tnx + tny*tny);
+	nx[i][j][k] = tnx/tn;
+	ny[i][j][k] = tny/tn;
+      }
+    }
+  }    
+}
+
+
 void Domain::init(void){
   for(int i=0;i<Nx;i++){
     for(int j=0;j<Ny;j++){
       //density
-      cellstate[i][j][0] = 1.0;
+      cellstate[i][j][0] = 1.111111111111111111;
       //u
       cellstate[i][j][1] = 1.0;
       //p
@@ -100,12 +153,35 @@ void Domain::init(void){
 
 void Domain::write_file(void){
   std::ofstream grid("grid.dat");
-  for(int i=0;i<Nx;i++){
-    for(int j=0;j<Ny;j++){
+  grid.precision(15);
+  for(int i=0;i<Nx+1;i++){
+    for(int j=0;j<Ny+1;j++){
       grid<<x[i][j]<<" "<<y[i][j]<<"\n";
     }
   }
   grid.close();
+  std::ofstream domain("domain.dat");
+  domain.precision(15);
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      domain<<" "<<xc[i][j]<<" "<<yc[i][j]<<" ";
+      for(int k=0;k<4;k++){
+	domain<<nx[i][j][k]<<" "<<ny[i][j][k]<<" ";
+      }
+      //!!!!!!!!!!!delete next two line, these are just for testing info
+      for(int k=0;k<4;k++){
+	domain<<xnx[i][j][k]<<" "<<yny[i][j][k]<<" ";
+      }
+
+      
+
+      for(int k=0;k<10;k++){
+	domain<<cellstate[i][j][k]<<" ";
+      }
+      domain<<"\n";
+    }
+  }
+  domain.close();
 }
 
 
@@ -113,9 +189,35 @@ void Domain::write_file(void){
 void Domain::setup(void){
   calc_coordinates();
   calc_centroid();
+  calc_normal();
   init();
   write_file();
 }
 
+
+
+class Bluff: public Domain {
+public:
+  virtual void calc_coordinates(void) override;
+};
+void Bluff::calc_coordinates(void){
+  double deta, dxeta, eta, xeta, theta, Rx, Ry;
+  deta = default_l/Ny;
+  dxeta = default_l/Nx;
+  eta = 0.0;
+  xeta = 0.0;
+  theta = 5*pi/12.0;
+  Rx = 3.0;
+  Ry = 6.0;
+  for(int i=0;i<Nx+1;i++){
+    xeta = 0.0;
+    for(int j=0;j<Ny+1;j++){
+      xeta += dxeta;
+      x[i][j] = (Rx - (Rx-1)*xeta)*cos(theta*(2*eta-1));
+      y[i][j] = (Ry - (Ry-1)*xeta)*sin(theta*(2*eta-1));
+    }
+    eta += deta;
+  }    
+}
 
 #endif
