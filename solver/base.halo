@@ -1,0 +1,17 @@
+#ifndef SOLVER_BASE_HALO
+#define SOLVER_BASE_HALO
+
+//include other modules
+#include "../utils/include.halo"
+#include "../geometry/include.halo"
+
+
+class Solver{
+public:
+  void setup(void);
+  void calc_flux(void);
+  void loop_time(void);
+};
+
+
+#endif
