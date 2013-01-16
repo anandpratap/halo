@@ -7,11 +7,122 @@
 
 
 class Solver{
+  
 public:
-  void setup(void);
+  int Nx, Ny;
+  int Nb;
+  Domain domain;
+  void setup(Domain domain);
+  void setup_boundary_conditions(void);			      
+  void apply_boundary_conditions(void);
   void calc_flux(void);
   void loop_time(void);
+  int btype[4];
+  variables bottom_freestream, right_freestream, top_freestream, left_freestream;
 };
 
+void Solver::setup(Domain idomain){
+  domain = idomain;
+  Nx = domain.Nx;
+  Ny = domain.Ny;
+  Nb = domain.boundary_cell;
+  btype[0] = 0;
+  btype[1] = 0; 
+  btype[2] = 0;  
+  btype[3] = 0;
+}
+
+
+// btype 
+// 0 -> free stream
+// 1 -> outflow
+// 2 -> reflective
+
+void Solver::apply_boundary_conditions(void){
+  // bottom boundary
+  for(int i=0; i< Nx; i++){
+    for(int j=0; j< Nb; j++){
+      variables bstate{0.0};
+      switch(btype[0]){
+      case 0:
+	bstate = bottom_freestream;
+	break;
+      case 1:
+	bstate = domain.cell[i][Nb].state;
+	break;
+      }
+      domain.cell[i][j].state = bstate;
+    }
+  }
+
+  // right boundary
+  for(int i=Nx-Nb; i< Nx; i++){
+    for(int j=0; j< Ny; j++){
+      variables bstate{0.0};
+      switch(btype[1]){
+      case 0:
+	bstate = right_freestream;
+	break;
+      case 1:
+	bstate = domain.cell[Nx-Nb-1][j].state;
+	break;
+      }
+      domain.cell[i][j].state = bstate;
+    }
+  }
+
+  // top boundary
+  for(int i=0; i< Nx; i++){
+    for(int j=Ny-Nb; j< Ny; j++){
+      variables bstate{0.0};
+      switch(btype[2]){
+      case 0:
+	bstate = top_freestream;
+	domain.cell[i][j].state = bstate;
+	break;
+      case 1:
+	bstate = domain.cell[i][Ny-Nb-1].state;
+	break;
+	
+      }
+      domain.cell[i][j].state = bstate;
+    }
+  }
+
+  // left boundary
+  for(int i=0; i< Nb; i++){
+    for(int j=0; j< Ny; j++){
+      variables bstate{0.0};
+      switch(btype[3]){
+      case 0:
+	bstate = left_freestream;
+	domain.cell[i][j].state = bstate;
+	break;
+      case 1:
+	bstate = domain.cell[Nb][j].state;
+	break;
+	
+      }
+      domain.cell[i][j].state = bstate;
+    }
+  }
+
+}
+
+void Solver::calc_flux(void){
+  cvariables UL, UR, U_avg;
+  scell cL, cR;
+  cL = domain.cell[1][1];
+  cR = domain.cell[1][2];
+  
+  UL = conservative(cL.state);
+  UR = conservative(cR.state);
+  U_avg = average(UL, UR, 1);
+  eigensystem sys = calc(U_avg);
+  vector fL, fR;
+  flux(UL, cL.normal[1], fL);
+  flux(UR, cR.normal[3], fR);
+
+}
 
 #endif

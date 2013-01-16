@@ -4,3 +4,5 @@
 #include "math.h"
 #include "./utils/include.halo"
 #include "./geometry/include.halo"
+#include "./solver/include.halo"
+#include <cassert>

@@ -1,6 +1,48 @@
 #ifndef UTILS_BASE_HALO
 #define UTILS_BASE_HALO
+#define GAMMA 1.4
 
-typedef double state [10];
+double sqr(double x){
+  return x*x;
+}
+
+void copy(double *source, double *dest){
+  for(int i=0;i<10;i++){
+    dest[i] = source[i];
+  }
+}
+
+int sgn(double x){
+  return x >=0 ?1:-1;  
+}
+
+double average(double a, double b){
+  return 0.5*(a + b);
+}
+
+
+void mult(matrix A, vector b, vector c){
+  double sum;
+  for(int i=0;i<8;i++){
+    sum = 0.0;
+    for(int j=0;j<8;j++){
+      sum += A[i][j]*b[j];
+    }
+    c[i] = sum;
+  }
+
+}
+
+void mult(vector b, matrix A, vector c){
+  double sum;
+  for(int i=0;i<8;i++){
+    sum = 0.0;
+    for(int j=0;j<8;j++){
+      sum += A[j][i]*b[j];
+    }
+    c[i] = sum;
+  }
+
+}
 
 #endif

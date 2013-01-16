@@ -1,0 +1,46 @@
+#ifndef UTILS_DEFN_HALO
+#define UTILS_DEFN_HALO
+#define GAMMA 1.4
+#define EP 0
+#define MP 1
+#define AM 2
+#define AP 3
+#define FM 4
+#define FP 5
+#define SM 6
+#define SP 7
+
+typedef double vector [8];
+typedef double matrix [8][8];
+struct point{
+  double x, y;
+};
+
+struct characteristic{
+  double eigenvalue;
+  vector leigenvector;
+  vector reigenvector;
+};
+
+struct eigensystem{
+  characteristic direction[8];
+  matrix R, L;
+};
+
+struct variables{
+  double u, v, w, Bx, By, Bz, p, p_full, rho, ex1, ex2;
+};
+
+struct cvariables{
+  double rhou, rhov, rhow, rho, Bx, By, Bz, E, c1, c2;
+};
+
+struct scell{
+  variables state;
+  point centroid;
+  point normal[4];
+  point vertex[4];
+};
+
+
+#endif

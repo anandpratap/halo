@@ -3,3 +3,5 @@
 *.dat
 *.py
 *.csv
+*doc*
+*run

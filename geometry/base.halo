@@ -4,10 +4,13 @@
 #include "../utils/base.halo"
 #include <fstream>
 #include <iostream>
-#define max_nx 100
-#define max_ny 100
-#define default_l 1.0
-#define pi 3.14
+
+#define MAX_NX 100
+#define MAX_NY 100
+#define BOUNDARY_CELL 10
+#define SIDE 1.0
+#define PI 3.14
+
 //maximum number of cell the code can handle at this point a 500x500
 //you will need to hard code the above values to change this behaviour
 //
@@ -35,47 +38,36 @@
 class Domain{
 public:
   //initializing variable corresponding to x, y coordiated for cell and corner points
-  double xc[max_nx][max_ny] = {};
-  double yc[max_nx][max_ny] = {};
-  double x[max_nx+1][max_ny+1] = {};
-  double y[max_nx+1][max_ny+1] = {};
-  double nx[max_nx][max_ny][4] = {};
-  double ny[max_nx][max_ny][4] = {};
-  //!!!!!!!!!!!delete next two line, these are just for testing info
-  double xnx[max_nx][max_ny][4] = {};
-  double yny[max_nx][max_ny][4] = {};
-
+  double x[MAX_NX+1][MAX_NY+1] = {};
+  double y[MAX_NX+1][MAX_NY+1] = {};
+  int boundary_cell = BOUNDARY_CELL;
   int Nx, Ny;
   //state properties of cell
   //Euler in 2D uses only 4 while ideal MHD uses 8
-  state cellstate[max_nx][max_ny] = {};
-  //for declaretion of state in utils/base.halo
-  //0 -> density
-  //1 -> u
-  //2 -> v
-  //3 -> w
-  //4 -> Bx
-  //5 -> By
-  //6 -> Bz
-  //7 -> p
-  //8,9 are redundant can be used in future for other purposes
-  
+  //declaration of state in utils/base.halo
+  scell cell[MAX_NX][MAX_NY] = {};
+
   //set the size of the domain
-  void set_size(int iNx, int iNy){Nx=iNx;Ny=iNy;}
-  //calc coordinates
+  void set_domain_size(int iNx, int iNy){Nx=iNx;Ny=iNy;}
+
+  //setup functions
   virtual void calc_coordinates(void);
-  void calc_centroid(void);
-  void calc_normal(void);
-  void init(void);
-  void write_file(void);
+  void set_vertex(int i, int j);
+  void calc_centroid(int i, int j);
+  void calc_normal(int i, int j);
+  void init(int i, int j);
+  void write_grid_file(void);
+  void write_domain_file(void);
   void setup(void);
+
 }; 
  
 
+
 //default calc coordinates makes a square domain of size 1
 void Domain::calc_coordinates(void){
-  double dx = default_l/Nx;
-  double dy = default_l/Ny;
+  double dx = SIDE/Nx;
+  double dy = SIDE/Ny;
   for(int i=0;i<Nx+1;i++){
     for(int j=0;j<Ny+1;j++){
       x[i][j] = i*dx;
@@ -84,74 +76,66 @@ void Domain::calc_coordinates(void){
   }    
 }
 
-void Domain::calc_centroid(void){
-  for(int i=0;i<Nx;i++){
-    for(int j=0;j<Ny;j++){
-      xc[i][j] = 0.25*(x[i][j] + x[i+1][j] + x[i+1][j+1] + x[i][j+1]);
-      yc[i][j] = 0.25*(y[i][j] + y[i+1][j] + y[i+1][j+1] + y[i][j+1]);
-    }
-  }    
+void Domain::set_vertex(int i, int j){
+  cell[i][j].vertex[0].x = x[i][j];
+  cell[i][j].vertex[0].y = y[i][j];
+
+  cell[i][j].vertex[1].x = x[i+1][j];
+  cell[i][j].vertex[1].y = y[i+1][j];
+
+  cell[i][j].vertex[2].x = x[i+1][j+1];
+  cell[i][j].vertex[2].y = y[i+1][j+1];
+
+  cell[i][j].vertex[3].x = x[i][j+1];
+  cell[i][j].vertex[3].y = y[i][j+1];
 }
 
-void Domain::calc_normal(void){
-  double tnx, tny, tn;
-  for(int i=0;i<Nx;i++){
-    for(int j=0;j<Ny;j++){
-      for(int k=0;k<4;k++){
-	if(k==0){
-	  tnx = (y[i+1][j] - y[i][j]);
-	  tny = -(x[i+1][j] - x[i][j]);
-	  //!!!!!!!!!!!delete next two line, these are just for testing info
-	  xnx[i][j][k] = x[i+1][j] + x[i][j];
-	  yny[i][j][k] = y[i+1][j] + y[i][j];
-	}
-	if(k==1){
-	  tnx = (y[i+1][j+1] - y[i+1][j]);
-	  tny = -(x[i+1][j+1] - x[i+1][j]);
-	  //!!!!!!!!!!!delete next two line, these are just for testing info
-	  xnx[i][j][k] = x[i+1][j+1] + x[i+1][j];
-	  yny[i][j][k] = y[i+1][j+1] + y[i+1][j];
-
-	}
-	if(k==2){
-	  tnx = (y[i][j+1] - y[i+1][j+1]);
-	  tny = -(x[i][j+1] - x[i+1][j+1]);
-	  //!!!!!!!!!!!delete next two line, these are just for testing info
-	  xnx[i][j][k] = x[i+1][j+1] + x[i][j+1];
-	  yny[i][j][k] = y[i+1][j+1] + y[i][j+1];
-	
-	}
-	if(k==3){
-	  tnx = (y[i][j] - y[i][j+1]);
-	  tny = -(x[i][j] - x[i][j+1]);
-	  //!!!!!!!!!!!delete next two line, these are just for testing info
-	  xnx[i][j][k] = x[i][j] + x[i][j+1];
-	  yny[i][j][k] = y[i][j] + y[i][j+1];
-	
-	}
-	tn = sqrt(tnx*tnx + tny*tny);
-	nx[i][j][k] = tnx/tn;
-	ny[i][j][k] = tny/tn;
-      }
-    }
-  }    
+void Domain::calc_centroid(int i, int j){
+  point sum{0.0,0.0};
+  for(int k=0;k<4;k++){
+    sum.x += cell[i][j].vertex[k].x;
+    sum.y += cell[i][j].vertex[k].y;
+  }
+  cell[i][j].centroid.x = 0.25*sum.x;
+  cell[i][j].centroid.y = 0.25*sum.y;
 }
 
-
-void Domain::init(void){
-  for(int i=0;i<Nx;i++){
-    for(int j=0;j<Ny;j++){
-      //density
-      cellstate[i][j][0] = 1.111111111111111111;
-      //u
-      cellstate[i][j][1] = 1.0;
-      //p
-      cellstate[i][j][7] = 1.0;
-    }
+void Domain::calc_normal(int i, int j){
+  point tn;
+  double mag;
+  for(int k=0;k<4;k++){
+    switch(k){
+    case 0:
+      tn.x = (y[i+1][j] - y[i][j]);
+      tn.y = -(x[i+1][j] - x[i][j]);
+      break;
+    case 1:
+      tn.x = (y[i+1][j+1] - y[i+1][j]);
+      tn.y = -(x[i+1][j+1] - x[i+1][j]);
+      break;
+    case 2:
+      tn.x = (y[i][j+1] - y[i+1][j+1]);
+      tn.y = -(x[i][j+1] - x[i+1][j+1]);
+      break;
+    case 3:
+      tn.x = (y[i][j] - y[i][j+1]);
+      tn.y = -(x[i][j] - x[i][j+1]);
+      break;
+    };
+    mag = magnitute(tn);
+    cell[i][j].normal[k].x = tn.x/mag;
+    cell[i][j].normal[k].y = tn.y/mag;
   }
 }
 
-void Domain::write_file(void){
+
+void Domain::init(int i, int j){
+      cell[i][j].state.u = 1.111111111111111111;
+      cell[i][j].state.v = 1.0;
+      cell[i][j].state.p = 1.0;
+}
+
+void Domain::write_grid_file(void){
   std::ofstream grid("grid.dat");
   grid.precision(15);
   for(int i=0;i<Nx+1;i++){
@@ -160,23 +144,19 @@ void Domain::write_file(void){
     }
   }
   grid.close();
+}
+
+void Domain::write_domain_file(void){
   std::ofstream domain("domain.dat");
   domain.precision(15);
   for(int i=0;i<Nx;i++){
     for(int j=0;j<Ny;j++){
-      domain<<" "<<xc[i][j]<<" "<<yc[i][j]<<" ";
+      domain<<" "<<cell[i][j].centroid.x<<" "<<cell[i][j].centroid.y<<" ";
       for(int k=0;k<4;k++){
-	domain<<nx[i][j][k]<<" "<<ny[i][j][k]<<" ";
+	domain<<cell[i][j].normal[k].x<<" "<<cell[i][j].normal[k].y<<" ";
       }
-      //!!!!!!!!!!!delete next two line, these are just for testing info
-      for(int k=0;k<4;k++){
-	domain<<xnx[i][j][k]<<" "<<yny[i][j][k]<<" ";
-      }
-
-      
-
       for(int k=0;k<10;k++){
-	domain<<cellstate[i][j][k]<<" ";
+	domain<<cell[i][j].state.u<<" ";
       }
       domain<<"\n";
     }
@@ -188,10 +168,16 @@ void Domain::write_file(void){
 
 void Domain::setup(void){
   calc_coordinates();
-  calc_centroid();
-  calc_normal();
-  init();
-  write_file();
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      set_vertex(i, j);
+      calc_centroid(i, j);
+      calc_normal(i, j);
+      init(i, j);
+    }
+  }
+  write_grid_file();
+  write_domain_file();
 }
 
 #endif

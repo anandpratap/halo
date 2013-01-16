@@ -8,11 +8,11 @@ public:
 };
 void Bluff::calc_coordinates(void){
   double deta, dxeta, eta, xeta, theta, Rx, Ry;
-  deta = default_l/Ny;
-  dxeta = default_l/Nx;
+  deta = SIDE/Ny;
+  dxeta = SIDE/Nx;
   eta = 0.0;
   xeta = 0.0;
-  theta = 5*pi/12.0;
+  theta = 5*PI/12.0;
   Rx = 3.0;
   Ry = 6.0;
   for(int i=0;i<Nx+1;i++){

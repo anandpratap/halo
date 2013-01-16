@@ -1,6 +1,9 @@
 #ifndef UTILS_INCLUDE_HALO
 #define UTILS_INCLUDE_HALO
-
+#include "defn.halo"
 #include "base.halo"
+#include "mhd.halo"
+#include "geometry.halo"
+
 
 #endif
