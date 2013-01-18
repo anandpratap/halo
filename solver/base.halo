@@ -4,32 +4,50 @@
 //include other modules
 #include "../utils/include.halo"
 #include "../geometry/include.halo"
-
+#include "../include.halo"
+#include "../defn.halo"
 
 class Solver{
   
 public:
   int Nx, Ny;
   int Nb;
+  double t, tf, dt;
   Domain domain;
   void setup(Domain domain);
-  void setup_boundary_conditions(void);			      
   void apply_boundary_conditions(void);
-  void calc_flux(void);
+  void calc_flux(int i, int j);
+  void loop_domain(void);
+  void advance_time(void);
   void loop_time(void);
+  void calc_dt(void);
+  void check_garbage(void);
   int btype[4];
   variables bottom_freestream, right_freestream, top_freestream, left_freestream;
 };
 
 void Solver::setup(Domain idomain){
+  std::cout<<"Solver Setup";
   domain = idomain;
+  Nb = domain.boundary_cell;
   Nx = domain.Nx;
   Ny = domain.Ny;
-  Nb = domain.boundary_cell;
+
+  tf = 0.01;
   btype[0] = 0;
-  btype[1] = 0; 
-  btype[2] = 0;  
-  btype[3] = 0;
+  btype[1] = 1; 
+  btype[2] = 1;  
+  btype[3] = 1;
+  bottom_freestream.w = 0.0;
+  bottom_freestream.u = 0.0;
+  bottom_freestream.v = 2.0;
+  bottom_freestream.Bx = 0.0;
+  bottom_freestream.By = 0.0;
+  bottom_freestream.Bz = 0.0;
+  bottom_freestream.rho = 1.0;
+  bottom_freestream.p = 1.0;
+  check_garbage();
+  std::cout<<"setup done";
 }
 
 
@@ -109,20 +127,162 @@ void Solver::apply_boundary_conditions(void){
 
 }
 
-void Solver::calc_flux(void){
-  cvariables UL, UR, U_avg;
-  scell cL, cR;
-  cL = domain.cell[1][1];
-  cR = domain.cell[1][2];
-  
-  UL = conservative(cL.state);
-  UR = conservative(cR.state);
-  U_avg = average(UL, UR, 1);
-  eigensystem sys = calc(U_avg);
-  vector fL, fR;
-  flux(UL, cL.normal[1], fL);
-  flux(UR, cR.normal[3], fR);
-
+void Solver::check_garbage(void){
+  for(int i=0;i<Nx;i++){
+    for(int j=0;j<Ny;j++){
+      scell c = domain.cell[i][j];
+      assert(c.state.rho != 0);
+      assert(c.state.p != 0);
+    }
+  }
 }
+
+void Solver::calc_flux(int i, int j){
+  cvariables UL, UR, U_avg;
+  vector VL, VR;
+  scell cL, cR;
+  vector uL, uR;
+  vector fL, fR, f;                      /// left and right flux in characteristic form
+  cL = domain.cell[i][j];         /// Left Cell
+  UL = conservative(cL.state);    /// Converting the states into conservative 
+  flux(UL, cL.normal[1], f);
+  convert(UL, uL);
+
+  for(int boundary=0; boundary<4; boundary++){
+    eigensystem sysl = calc(UL, cL.normal[boundary]);
+    cR = domain.cell[i+iindex(boundary)][j+jindex(boundary)];         /// Right Cell
+    UR = conservative(cR.state);
+    U_avg = average(UL, UR, 1);     /// Taking average of states
+    /// average function in utility/mhd.halo
+    eigensystem sys = calc(U_avg, cL.normal[boundary]);      /// Calculating the eigensystems
+    /// definition of eigensystem in utility/defn.halo
+    eigensystem sysr = calc(UR, cL.normal[boundary]);
+    mult(sys.L, uL, VL);
+    mult(sys.L, f, fL);
+    convert(UR, uR);
+    mult(sys.L, uR, VR);
+    flux(UR, cR.normal[3], f);
+    mult(sys.L, f, fR);
+    
+    //Applying the Roe's Flux Formulation:-
+    mult(sys.R, VL, uL);
+    mult(sys.R, VR, uR);
+    vector FL, FR;
+    mult(sys.R, fL, FL);
+    mult(sys.R, fR, FR);
+    if(DEBUG){
+      for(int l=0; l<8;l++){
+	for(int m=0;m<8;m++){
+	  //std::cout<<sys.L[l][m];
+	}
+      }
+      for(int tmptmp=0;tmptmp<8;tmptmp++){
+	//assert(uL[tmptmp] != 0);
+      }
+    }
+
+    vector rest = {0.0};
+    for (int k = 0; k < 8; k++){
+      double ws = 0;
+      vector l, r;
+      copy(sys.direction[k].leigenvector, l);
+      copy(sys.direction[k].reigenvector, r);
+
+      vector U_diff;
+      for (int m = 0; m < 8; m++){
+	U_diff[m] = uR[m] - uL[m];
+      }
+      for (int m = 0; m < 8; m++){
+	ws += l[m] * U_diff[m];
+      }
+      
+      double fix, delta;
+      double evalue = sys.direction[k].eigenvalue;
+      double stuff = 4*(sysr.direction[k].eigenvalue - sysl.direction[k].eigenvalue);
+      if (stuff > SMALL){
+	delta = stuff;
+      }else{
+	delta = SMALL;
+      }
+      if (mod(evalue) >= (delta/2)){
+	fix = mod(evalue);
+      }else{
+	fix = (evalue*evalue / delta) + (delta / 4);
+      }
+      
+      ws *= fix;
+      
+      for (int m = 0; m < 8; m++){
+	rest[m] += ws * r[m];
+      }
+      
+    }
+    vector flu;
+    for (int k = 0; k < 8; k++){
+      flu[k] = (FL[k] + FR[k]) / 2 - rest[k]/2;
+    }
+    
+    //std::cout<<cL.facelength[boundary]<<"\n";
+    for (int k = 0; k < 8; k++)	{
+      cL.F[boundary][k] = flu[k]*cL.facelength[boundary]; //*facelength
+    } 
+  }
+  
+  for(int m=0; m < 8; m++){
+    cL.residue[m] = 0.0;
+    for(int k=0; k < 4; k++){
+      cL.residue[m] += cL.F[k][m];
+    }
+    cL.residue[m] /= cL.area;
+    if(DEBUG){
+      std::cout<<cL.residue[m]<<"\n";
+      //assert(cL.residue[m] != 0);
+    }
+  }
+}
+
+void Solver::loop_domain(void){
+  for(int i = 1; i < Nx-1; i++){
+    for(int j = 1; j < Ny-1; j++){
+      calc_flux(i, j);
+    }
+  }
+}
+
+void Solver::calc_dt(void){
+  dt = 0.0000001;
+}
+
+void Solver::advance_time(void){
+  vector U;
+  cvariables UU;
+  scell c;
+  for(int i = 0; i < Nx; i++){
+    for(int j = 0; j < Ny; j++){
+      c = domain.cell[i][j];
+      convert(conservative(c.state),U);
+      for(int k=0; k<8; k++){
+	U[k] += c.residue[k]*dt;
+      }
+      convert(U, UU);
+      domain.cell[i][j].state = primitive(UU);
+    }
+  }
+}
+
+void Solver::loop_time(void){
+  t = 0.0;
+  while(t < tf){
+    check_garbage();
+    apply_boundary_conditions();
+    loop_domain();
+    calc_dt();
+    advance_time();
+    t += dt;
+    std::cout<<t<<"\n";
+  }
+  domain.write_domain_file();
+}
+
 
 #endif

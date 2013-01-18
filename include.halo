@@ -1,8 +1,9 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <cassert>
 #include "math.h"
+#define DEBUG 1
 #include "./utils/include.halo"
 #include "./geometry/include.halo"
 #include "./solver/include.halo"
-#include <cassert>

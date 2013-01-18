@@ -1,13 +1,13 @@
 #ifndef GEOMETRY_BASE_HALO
 #define GEOMETRY_BASE_HALO
 //include utils
-#include "../utils/base.halo"
+#include "../utils/include.halo"
 #include <fstream>
 #include <iostream>
 
-#define MAX_NX 100
-#define MAX_NY 100
-#define BOUNDARY_CELL 10
+#define MAX_NX 50
+#define MAX_NY 50
+#define BOUNDARY_CELL 2
 #define SIDE 1.0
 #define PI 3.14
 
@@ -55,6 +55,8 @@ public:
   void set_vertex(int i, int j);
   void calc_centroid(int i, int j);
   void calc_normal(int i, int j);
+  void calc_area(int i, int j);
+  void calc_facelength(int i, int j);
   void init(int i, int j);
   void write_grid_file(void);
   void write_domain_file(void);
@@ -66,6 +68,7 @@ public:
 
 //default calc coordinates makes a square domain of size 1
 void Domain::calc_coordinates(void){
+  std::cout<< "Calculating coordinates";
   double dx = SIDE/Nx;
   double dy = SIDE/Ny;
   for(int i=0;i<Nx+1;i++){
@@ -90,6 +93,10 @@ void Domain::set_vertex(int i, int j){
   cell[i][j].vertex[3].y = y[i][j+1];
 }
 
+void Domain::calc_area(int i, int j){
+  cell[i][j].area = area(cell[i][j]);
+}
+
 void Domain::calc_centroid(int i, int j){
   point sum{0.0,0.0};
   for(int k=0;k<4;k++){
@@ -98,6 +105,13 @@ void Domain::calc_centroid(int i, int j){
   }
   cell[i][j].centroid.x = 0.25*sum.x;
   cell[i][j].centroid.y = 0.25*sum.y;
+}
+
+void Domain::calc_facelength(int i, int j){
+  cell[i][j].facelength[0] = distance(cell[i][j].vertex[0], cell[i][j].vertex[1]);
+  cell[i][j].facelength[1] = distance(cell[i][j].vertex[1], cell[i][j].vertex[2]);
+  cell[i][j].facelength[2] = distance(cell[i][j].vertex[2], cell[i][j].vertex[3]);
+  cell[i][j].facelength[3] = distance(cell[i][j].vertex[3], cell[i][j].vertex[0]);
 }
 
 void Domain::calc_normal(int i, int j){
@@ -130,9 +144,14 @@ void Domain::calc_normal(int i, int j){
 
 
 void Domain::init(int i, int j){
-      cell[i][j].state.u = 1.111111111111111111;
-      cell[i][j].state.v = 1.0;
-      cell[i][j].state.p = 1.0;
+  cell[i][j].state.u = 1.0;
+  cell[i][j].state.v = 1.0;
+  cell[i][j].state.p = 1.0;
+  cell[i][j].state.rho = 1.0;
+  cell[i][j].state.Bx = 0.0;
+  cell[i][j].state.By = 0.0;
+  cell[i][j].state.Bz = 0.0;
+  cell[i][j].state.w = 1.0;
 }
 
 void Domain::write_grid_file(void){
@@ -151,13 +170,19 @@ void Domain::write_domain_file(void){
   domain.precision(15);
   for(int i=0;i<Nx;i++){
     for(int j=0;j<Ny;j++){
-      domain<<" "<<cell[i][j].centroid.x<<" "<<cell[i][j].centroid.y<<" ";
+      domain<<""<<cell[i][j].centroid.x<<" "<<cell[i][j].centroid.y<<" ";
       for(int k=0;k<4;k++){
 	domain<<cell[i][j].normal[k].x<<" "<<cell[i][j].normal[k].y<<" ";
       }
-      for(int k=0;k<10;k++){
-	domain<<cell[i][j].state.u<<" ";
-      }
+      domain<<cell[i][j].state.rho<<" ";
+      domain<<cell[i][j].state.u<<" ";
+      domain<<cell[i][j].state.v<<" ";
+      domain<<cell[i][j].state.w<<" ";
+      domain<<cell[i][j].state.Bx<<" ";
+      domain<<cell[i][j].state.By<<" ";
+      domain<<cell[i][j].state.Bz<<" ";
+      domain<<cell[i][j].state.p<<" ";
+      
       domain<<"\n";
     }
   }
@@ -173,6 +198,8 @@ void Domain::setup(void){
       set_vertex(i, j);
       calc_centroid(i, j);
       calc_normal(i, j);
+      calc_facelength(i, j);
+      calc_area(i, j);
       init(i, j);
     }
   }

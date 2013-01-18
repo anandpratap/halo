@@ -2,9 +2,42 @@
 #define UTILS_BASE_HALO
 #define GAMMA 1.4
 
+int iindex(int boundary){
+  switch(boundary){
+  case 0:
+    return 0;
+  case 1:
+    return 1;
+  case 2:
+    return 0;
+  case 3:
+    return -1;
+  default:
+    return -100000;
+  }
+  
+}
+int jindex(int boundary){
+  switch(boundary){
+  case 0:
+    return -1;
+  case 1:
+    return 0;
+  case 2:
+    return 1;
+  case 3:
+    return 0;
+  default:
+    return -100000;
+
+  }
+}
+
+
 double sqr(double x){
   return x*x;
 }
+
 
 void copy(double *source, double *dest){
   for(int i=0;i<10;i++){
@@ -15,6 +48,10 @@ void copy(double *source, double *dest){
 int sgn(double x){
   return x >=0 ?1:-1;  
 }
+//Modulus function
+double mod(double x){
+  return x < 0 ? -x:x;
+}
 
 double average(double a, double b){
   return 0.5*(a + b);
@@ -22,27 +59,44 @@ double average(double a, double b){
 
 
 void mult(matrix A, vector b, vector c){
-  double sum;
   for(int i=0;i<8;i++){
-    sum = 0.0;
+    c[i] = 0.0;
     for(int j=0;j<8;j++){
-      sum += A[i][j]*b[j];
+      c[i] += A[i][j]*b[j];
     }
-    c[i] = sum;
   }
-
 }
 
 void mult(vector b, matrix A, vector c){
-  double sum;
   for(int i=0;i<8;i++){
-    sum = 0.0;
+    c[i] = 0.0;
     for(int j=0;j<8;j++){
-      sum += A[j][i]*b[j];
+      c[i] += A[j][i]*b[j];
     }
-    c[i] = sum;
-  }
+   }
 
+}
+
+void convert(cvariables a, vector b){
+  b[0] = a.rho;
+  b[1] = a.rhou;
+  b[2] = a.rhov;
+  b[3] = a.rhow;
+  b[4] = a.Bx;
+  b[5] = a.By;
+  b[6] = a.Bz;
+  b[7] = a.E;
+} 
+
+void convert(vector a, cvariables b){
+  b.rho = a[0];
+  b.rhou = a[1];
+  b.rhov = a[2];
+  b.rhow = a[3];
+  b.Bx = a[4];
+  b.By = a[5];
+  b.Bz = a[6];
+  b.E = a[7];
 }
 
 #endif
