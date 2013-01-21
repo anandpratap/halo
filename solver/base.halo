@@ -14,17 +14,21 @@ public:
   int Nb;
   double t, tf, dt;
   Domain domain;
-  void setup(Domain domain);
-  void apply_boundary_conditions(void);
-  void calc_flux(int i, int j);
-  void loop_domain(void);
-  void advance_time(void);
-  void loop_time(void);
-  void calc_dt(void);
-  void check_garbage(void);
   int btype[4];
-  variables bottom_freestream, right_freestream, top_freestream, left_freestream;
+  variables freestream[4];
+  void setup(Domain domain);
+  void setBoundary(int bottom, int right, int top, int left);
+  void setTime(double t);
+  void setFreestream(int boundary, variables freestream);
+  void applyBoundaryConditions(void);
+  void calcFlux(int i, int j);
+  void loopDomain(void);
+  void advanceTime(void);
+  void loopTime(void);
+  void calcDt(void);
+  void checkGarbage(void);
 };
+
 
 void Solver::setup(Domain idomain){
   std::cout<<"Solver Setup";
@@ -32,38 +36,38 @@ void Solver::setup(Domain idomain){
   Nb = domain.boundary_cell;
   Nx = domain.Nx;
   Ny = domain.Ny;
-
-  tf = 0.01;
-  btype[0] = 0;
-  btype[1] = 1; 
-  btype[2] = 1;  
-  btype[3] = 1;
-  bottom_freestream.w = 0.0;
-  bottom_freestream.u = 0.0;
-  bottom_freestream.v = 2.0;
-  bottom_freestream.Bx = 0.0;
-  bottom_freestream.By = 0.0;
-  bottom_freestream.Bz = 0.0;
-  bottom_freestream.rho = 1.0;
-  bottom_freestream.p = 1.0;
-  check_garbage();
+  checkGarbage();
   std::cout<<"setup done";
 }
 
+void Solver::setBoundary(int bottom, int right, int top, int left){
+  btype[0] = bottom;
+  btype[1] = right;
+  btype[2] = top;
+  btype[3] = left;
+}
+
+void Solver::setTime(double t){
+  tf = t;
+}
+
+void Solver::setFreestream(int boundary, variables ifreestream){
+  freestream[boundary] = ifreestream;
+}
 
 // btype 
 // 0 -> free stream
 // 1 -> outflow
 // 2 -> reflective
 
-void Solver::apply_boundary_conditions(void){
+void Solver::applyBoundaryConditions(void){
   // bottom boundary
   for(int i=0; i< Nx; i++){
     for(int j=0; j< Nb; j++){
       variables bstate{0.0};
       switch(btype[0]){
       case 0:
-	bstate = bottom_freestream;
+	bstate = freestream[0];
 	break;
       case 1:
 	bstate = domain.cell[i][Nb].state;
@@ -79,7 +83,7 @@ void Solver::apply_boundary_conditions(void){
       variables bstate{0.0};
       switch(btype[1]){
       case 0:
-	bstate = right_freestream;
+	bstate = freestream[1];
 	break;
       case 1:
 	bstate = domain.cell[Nx-Nb-1][j].state;
@@ -95,7 +99,7 @@ void Solver::apply_boundary_conditions(void){
       variables bstate{0.0};
       switch(btype[2]){
       case 0:
-	bstate = top_freestream;
+	bstate = freestream[2];
 	domain.cell[i][j].state = bstate;
 	break;
       case 1:
@@ -113,7 +117,7 @@ void Solver::apply_boundary_conditions(void){
       variables bstate{0.0};
       switch(btype[3]){
       case 0:
-	bstate = left_freestream;
+	bstate = freestream[3];
 	domain.cell[i][j].state = bstate;
 	break;
       case 1:
@@ -127,7 +131,7 @@ void Solver::apply_boundary_conditions(void){
 
 }
 
-void Solver::check_garbage(void){
+void Solver::checkGarbage(void){
   for(int i=0;i<Nx;i++){
     for(int j=0;j<Ny;j++){
       scell c = domain.cell[i][j];
@@ -137,39 +141,39 @@ void Solver::check_garbage(void){
   }
 }
 
-void Solver::calc_flux(int i, int j){
+void Solver::calcFlux(int i, int j){
   cvariables UL, UR, U_avg;
   vector VL, VR;
   scell cL, cR;
   vector uL, uR;
   vector fL, fR, f;                      /// left and right flux in characteristic form
   cL = domain.cell[i][j];         /// Left Cell
-  UL = conservative(cL.state);    /// Converting the states into conservative 
-  flux(UL, cL.normal[1], f);
-  convert(UL, uL);
+  UL = mhd::conservative(cL.state);    /// Converting the states into conservative 
+  mhd::flux(UL, cL.normal[1], f);
+  utils::convert(UL, uL);
 
   for(int boundary=0; boundary<4; boundary++){
-    eigensystem sysl = calc(UL, cL.normal[boundary]);
+    eigensystem sysl = mhd::calc(UL, cL.normal[boundary]);
     cR = domain.cell[i+iindex(boundary)][j+jindex(boundary)];         /// Right Cell
-    UR = conservative(cR.state);
+    UR = mhd::conservative(cR.state);
     U_avg = average(UL, UR, 1);     /// Taking average of states
     /// average function in utility/mhd.halo
-    eigensystem sys = calc(U_avg, cL.normal[boundary]);      /// Calculating the eigensystems
+    eigensystem sys = mhd::calc(U_avg, cL.normal[boundary]);      /// Calculating the eigensystems
     /// definition of eigensystem in utility/defn.halo
-    eigensystem sysr = calc(UR, cL.normal[boundary]);
-    mult(sys.L, uL, VL);
-    mult(sys.L, f, fL);
-    convert(UR, uR);
-    mult(sys.L, uR, VR);
-    flux(UR, cR.normal[3], f);
-    mult(sys.L, f, fR);
+    eigensystem sysr = mhd::calc(UR, cL.normal[boundary]);
+    math::mult(sys.L, uL, VL);
+    math::mult(sys.L, f, fL);
+    utils::convert(UR, uR);
+    math::mult(sys.L, uR, VR);
+    mhd::flux(UR, cR.normal[3], f);
+    math::mult(sys.L, f, fR);
     
     //Applying the Roe's Flux Formulation:-
-    mult(sys.R, VL, uL);
-    mult(sys.R, VR, uR);
+    math::mult(sys.R, VL, uL);
+    math::mult(sys.R, VR, uR);
     vector FL, FR;
-    mult(sys.R, fL, FL);
-    mult(sys.R, fR, FR);
+    math::mult(sys.R, fL, FL);
+    math::mult(sys.R, fR, FR);
     if(DEBUG){
       for(int l=0; l<8;l++){
 	for(int m=0;m<8;m++){
@@ -185,8 +189,8 @@ void Solver::calc_flux(int i, int j){
     for (int k = 0; k < 8; k++){
       double ws = 0;
       vector l, r;
-      copy(sys.direction[k].leigenvector, l);
-      copy(sys.direction[k].reigenvector, r);
+      utils::copy(sys.direction[k].leigenvector, l);
+      utils::copy(sys.direction[k].reigenvector, r);
 
       vector U_diff;
       for (int m = 0; m < 8; m++){
@@ -224,7 +228,7 @@ void Solver::calc_flux(int i, int j){
     
     //std::cout<<cL.facelength[boundary]<<"\n";
     for (int k = 0; k < 8; k++)	{
-      cL.F[boundary][k] = flu[k]*cL.facelength[boundary]; //*facelength
+      cL.F[boundary][k] = flu[k]*cL.facelength[boundary];
     } 
   }
   
@@ -241,43 +245,43 @@ void Solver::calc_flux(int i, int j){
   }
 }
 
-void Solver::loop_domain(void){
+void Solver::loopDomain(void){
   for(int i = 1; i < Nx-1; i++){
     for(int j = 1; j < Ny-1; j++){
-      calc_flux(i, j);
+      calcFlux(i, j);
     }
   }
 }
 
-void Solver::calc_dt(void){
+void Solver::calcDt(void){
   dt = 0.0000001;
 }
 
-void Solver::advance_time(void){
+void Solver::advanceTime(void){
   vector U;
   cvariables UU;
   scell c;
   for(int i = 0; i < Nx; i++){
     for(int j = 0; j < Ny; j++){
       c = domain.cell[i][j];
-      convert(conservative(c.state),U);
+      convert(mhd::conservative(c.state),U);
       for(int k=0; k<8; k++){
 	U[k] += c.residue[k]*dt;
       }
       convert(U, UU);
-      domain.cell[i][j].state = primitive(UU);
+      domain.cell[i][j].state = mhd::primitive(UU);
     }
   }
 }
 
-void Solver::loop_time(void){
+void Solver::loopTime(void){
   t = 0.0;
   while(t < tf){
-    check_garbage();
-    apply_boundary_conditions();
-    loop_domain();
-    calc_dt();
-    advance_time();
+    checkGarbage();
+    applyBoundaryConditions();
+    loopDomain();
+    calcDt();
+    advanceTime();
     t += dt;
     std::cout<<t<<"\n";
   }

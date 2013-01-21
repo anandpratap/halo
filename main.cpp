@@ -9,6 +9,17 @@ int main(void){
   cout<<"Everything seems fine"<<"\n";
   Solver s;
   s.setup(g);
-  s.loop_time();
+  // boundary setup
+  s.setBoundary(0, 1, 1, 1);
+  variables freestream;
+  freestream.rho = 1.0;
+  freestream.u = 0.0; freestream.v = 2.0; freestream.w = 0.0;  
+  freestream.Bx = 0.0; freestream.By = 0.0; freestream.Bz = 0.0;
+  freestream.p = 1.0;
+  s.setFreestream(0, freestream);
+  // set time
+  s.setTime(0.01);
+  
+  s.loopTime();
   return 0;
 }

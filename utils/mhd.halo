@@ -3,436 +3,435 @@
 #define GAMMA 1.4
 #include <cassert>
 #include "../defn.halo"
-
-variables primitive(cvariables input){
-  variables o;
-  o.rho = input.rho;
-  o.u = input.rhou/input.rho;
-  o.v = input.rhov/input.rho;
-  o.w = input.rhow/input.rho;
-  o.Bx = input.Bx;
-  o.By = input.By;
-  o.Bz = input.Bz;
-  o.p = (GAMMA-1.0)*(input.E - o.rho*(o.u*o.u + o.v*o.v + o.w*o.w)/2 - (o.Bx*o.Bx + o.By*o.By + o.Bz*o.Bz)/2);
-  o.p_full = o.p + (o.Bx*o.Bx + o.By*o.By + o.Bz*o.Bz)/2.0;
-  return o;
-}
-
-cvariables conservative(variables input){
-  cvariables o;
-  o.rho = input.rho;
-  o.rhou = input.rho*input.u;
-  o.rhov = input.rho*input.v;  
-  o.rhow = input.rho*input.w;
-  o.E = input.p/(GAMMA-1) + .5*input.rho*(pow(input.u,2) + pow(input.v,2) + pow(input.w,2)); 
-  o.Bx = input.Bx;
-  o.By = input.By;
-  o.Bz = input.Bz;
-  return o;
-}
-
-cvariables average(cvariables ul, cvariables ur, int type){
-  variables VL, VR, V;
-  VL = primitive(ul);
-  VR = primitive(ur);
-  switch(type){
-    // simple averaging
-  case 1:
-    if(DEBUG){
-      //std::cout<<"averaging";
-      //assert(VL.v!=VR.v);
+namespace mhd{
+  variables primitive(cvariables input){
+    variables o;
+    o.rho = input.rho;
+    o.u = input.rhou/input.rho;
+    o.v = input.rhov/input.rho;
+    o.w = input.rhow/input.rho;
+    o.Bx = input.Bx;
+    o.By = input.By;
+    o.Bz = input.Bz;
+    o.p = (GAMMA-1.0)*(input.E - o.rho*(o.u*o.u + o.v*o.v + o.w*o.w)/2 - (o.Bx*o.Bx + o.By*o.By + o.Bz*o.Bz)/2);
+    o.p_full = o.p + (o.Bx*o.Bx + o.By*o.By + o.Bz*o.Bz)/2.0;
+    return o;
+  }
+  
+  cvariables conservative(variables input){
+    cvariables o;
+    o.rho = input.rho;
+    o.rhou = input.rho*input.u;
+    o.rhov = input.rho*input.v;  
+    o.rhow = input.rho*input.w;
+    o.E = input.p/(GAMMA-1) + .5*input.rho*(pow(input.u,2) + pow(input.v,2) + pow(input.w,2)); 
+    o.Bx = input.Bx;
+    o.By = input.By;
+    o.Bz = input.Bz;
+    return o;
+  }
+  
+  cvariables average(cvariables ul, cvariables ur, int type){
+    variables VL, VR, V;
+    VL = primitive(ul);
+    VR = primitive(ur);
+    switch(type){
+      // simple averaging
+    case 1:
+      if(DEBUG){
+	//std::cout<<"averaging";
+	//assert(VL.v!=VR.v);
+      }
+      V.rho = math::average(VL.rho, VR.rho);
+      V.u = math::average(VL.u, VR.u);
+      V.v = math::average(VL.v, VR.v);
+      V.w = math::average(VL.w, VR.w);
+      V.Bx = math::average(VL.Bx, VR.Bx);
+      V.By = math::average(VL.By, VR.By);
+      V.Bz = math::average(VL.Bz, VR.Bz);
+      V.p_full = math::average(VL.p_full, VR.p_full);
+      V.p = V.p_full - (V.Bx*V.Bx + V.By*V.By + V.Bz*V.Bz)/2.0; 
+      break;
     }
-    V.rho = average(VL.rho, VR.rho);
-    V.u = average(VL.u, VR.u);
-    V.v = average(VL.v, VR.v);
-    V.w = average(VL.w, VR.w);
-    V.Bx = average(VL.Bx, VR.Bx);
-    V.By = average(VL.By, VR.By);
-    V.Bz = average(VL.Bz, VR.Bz);
-    V.p_full = average(VL.p_full, VR.p_full);
-    V.p = V.p_full - (V.Bx*V.Bx + V.By*V.By + V.Bz*V.Bz)/2.0; 
-    break;
+  
+    cvariables output;
+    output = conservative(V);
+    return output;
   }
-  
-  cvariables output;
-  output = conservative(V);
-  return output;
-}
 
 
 
-eigensystem calc(cvariables U, point normal){
-  variables V;
-  V = primitive(U);
-  eigensystem sys;
-  double alpha_f, alpha_s, beta_t, beta_z, a, cs, cf, ca;
-  vector ev;
-  double rho, w, Bz;
-  rho = V.rho;
-  w = V.w;
-  Bz = V.Bz;
+  eigensystem calc(cvariables U, point normal){
+    variables V;
+    V = primitive(U);
+    eigensystem sys;
+    double alpha_f, alpha_s, beta_t, beta_z, a, cs, cf, ca;
+    vector ev;
+    double rho, w, Bz;
+    rho = V.rho;
+    w = V.w;
+    Bz = V.Bz;
 
-  ca = V.Bx/sqrt(V.rho);
-  a = sqrt (GAMMA*V.p/V.rho); //speed of sound
-  double Bn, Bt, un, ut;
-  double A;
-  A = (GAMMA*V.p + (V.Bx*V.Bx + V.By*V.By + V.Bz*V.Bz)) / V.rho;
-  Bn = V.Bx*normal.x + V.By*normal.y;
-  Bt = V.By*normal.x - V.Bx*normal.y;
-  un = V.u*normal.x + V.v*normal.y;
-  ut = V.v*normal.x - V.u*normal.y;
+    ca = V.Bx/sqrt(V.rho);
+    a = sqrt (GAMMA*V.p/V.rho); //speed of sound
+    double Bn, Bt, un, ut;
+    double A;
+    A = (GAMMA*V.p + (V.Bx*V.Bx + V.By*V.By + V.Bz*V.Bz)) / V.rho;
+    Bn = V.Bx*normal.x + V.By*normal.y;
+    Bt = V.By*normal.x - V.Bx*normal.y;
+    un = V.u*normal.x + V.v*normal.y;
+    ut = V.v*normal.x - V.u*normal.y;
   
-  double bn, bt, bz;
-  bn = Bn / sqrt(V.rho);
-  bt = Bt / sqrt(V.rho);
-  bz = V.Bz / sqrt(V.rho);
+    double bn, bt, bz;
+    bn = Bn / sqrt(V.rho);
+    bt = Bt / sqrt(V.rho);
+    bz = V.Bz / sqrt(V.rho);
   
-  if (((bt*bt+bz*bz)/(a*a)) < SMALL){
-    beta_t = 1.0 / sqrt(2.0);
-    beta_z = 1.0 / sqrt(2.0);
-  }else{
-    beta_t = bt / sqrt(bt*bt + bz*bz);
-    beta_z = bz / sqrt(bt*bt + bz*bz);
-  }
-  
-  if ((((bn*bn) / (a*a)) < SMALL) && (((bt*bt + bz*bz) / (a*a)) > SMALL)){
-    cf = sqrt(a*a + (bt*bt + bz*bz));
-    cs = sqrt((a*a * bn*bn) / (a*a + (bt*bt + bz*bz)));
-    alpha_f = sqrt ((a*a) / (a*a + (bt*bt + bz*bz)));
-    alpha_s = sqrt ((bt*bt + bz*bz) / (a*a + (bt*bt+bz*bz)));
-  }else if ((((bn*bn) / (a*a)) <= SMALL) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
-    cf = a;
-    cs = 0;
-    alpha_f = 1;
-    alpha_s = 0;
-  }else if ((mod(bn) < (a - SMALL)) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
-    cf = a;
-    cs = bn;
-    alpha_f = 1;
-    alpha_s = 0;
-  }else if ((mod(bn) > (a + SMALL)) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
-    cf = bn;
-    cs = a;
-    alpha_f = 0;
-    alpha_s = 1;
-  }else if (((mod(bn*bn - a*a) / (a*a)) <= SMALL) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
-    cf = a;
-    cs = a;
-    double phi;
-    if (mod((mod(bn) - a)/a) < SMALL){
-      phi = 3.1416 / 2.0;
+    if (((bt*bt+bz*bz)/(a*a)) < SMALL){
+      beta_t = 1.0 / sqrt(2.0);
+      beta_z = 1.0 / sqrt(2.0);
     }else{
-      phi = atan((sqrt(bt*bt + bz*bz)) / (mod(bn) - a));
+      beta_t = bt / sqrt(bt*bt + bz*bz);
+      beta_z = bz / sqrt(bt*bt + bz*bz);
     }
-    alpha_f = sin (phi/2.0);
-    alpha_s = cos (phi/2.0);
-  }else if ((((a*a) / (bn*bn)) <= SMALL) && (((a*a) / (bt*bt + bz*bz)) <= SMALL)){
-    cf = sqrt(bn*bn + bt*bt + bz*bz);
-    cs = 0;
-    alpha_f = 0;
-    alpha_s = 1;
-  }else{
-    cs = sqrt((A - sqrt(A*A - 4*a*a*bn*bn)) / 2);
-    cf = sqrt((A + sqrt(A*A - 4*a*a*bn*bn)) / 2);
-    alpha_f = sqrt((a*a - cs*cs) / (cf*cf - cs*cs));
-    alpha_s = sqrt((cf*cf - a*a) / (cf*cf - cs*cs));
-  }
+  
+    if ((((bn*bn) / (a*a)) < SMALL) && (((bt*bt + bz*bz) / (a*a)) > SMALL)){
+      cf = sqrt(a*a + (bt*bt + bz*bz));
+      cs = sqrt((a*a * bn*bn) / (a*a + (bt*bt + bz*bz)));
+      alpha_f = sqrt ((a*a) / (a*a + (bt*bt + bz*bz)));
+      alpha_s = sqrt ((bt*bt + bz*bz) / (a*a + (bt*bt+bz*bz)));
+    }else if ((((bn*bn) / (a*a)) <= SMALL) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
+      cf = a;
+      cs = 0;
+      alpha_f = 1;
+      alpha_s = 0;
+    }else if ((math::mod(bn) < (a - SMALL)) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
+      cf = a;
+      cs = bn;
+      alpha_f = 1;
+      alpha_s = 0;
+    }else if ((math::mod(bn) > (a + SMALL)) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
+      cf = bn;
+      cs = a;
+      alpha_f = 0;
+      alpha_s = 1;
+    }else if (((math::mod(bn*bn - a*a) / (a*a)) <= SMALL) && (((bt*bt + bz*bz) / (a*a)) <= SMALL)){
+      cf = a;
+      cs = a;
+      double phi;
+      if (math::mod((math::mod(bn) - a)/a) < SMALL){
+	phi = 3.1416 / 2.0;
+      }else{
+	phi = atan((sqrt(bt*bt + bz*bz)) / (math::mod(bn) - a));
+      }
+      alpha_f = sin (phi/2.0);
+      alpha_s = cos (phi/2.0);
+    }else if ((((a*a) / (bn*bn)) <= SMALL) && (((a*a) / (bt*bt + bz*bz)) <= SMALL)){
+      cf = sqrt(bn*bn + bt*bt + bz*bz);
+      cs = 0;
+      alpha_f = 0;
+      alpha_s = 1;
+    }else{
+      cs = sqrt((A - sqrt(A*A - 4*a*a*bn*bn)) / 2);
+      cf = sqrt((A + sqrt(A*A - 4*a*a*bn*bn)) / 2);
+      alpha_f = sqrt((a*a - cs*cs) / (cf*cf - cs*cs));
+      alpha_s = sqrt((cf*cf - a*a) / (cf*cf - cs*cs));
+    }
   
   
 
 
-  { 
-    // entropy wave
-    sys.direction[EP].eigenvalue = V.u;
-    // left eigenvector
-    ev[0] = 1 - (GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*a*a);
-    ev[1] = (GAMMA-1.0)*un / (a*a);
-    ev[2] = (GAMMA-1.0)*ut / (a*a);
-    ev[3] = (GAMMA-1.0)*w / (a*a);
-    ev[4] = (GAMMA-1.0)*Bn / (a*a);
-    ev[5] = (GAMMA-1.0)*Bt / (a*a);
-    ev[6] = (GAMMA-1.0)*Bz / (a*a);
-    ev[7] = (1.0-GAMMA) / (a*a);
-    copy(ev, sys.direction[EP].leigenvector);
+    { 
+      // entropy wave
+      sys.direction[EP].eigenvalue = V.u;
+      // left eigenvector
+      ev[0] = 1 - (GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*a*a);
+      ev[1] = (GAMMA-1.0)*un / (a*a);
+      ev[2] = (GAMMA-1.0)*ut / (a*a);
+      ev[3] = (GAMMA-1.0)*w / (a*a);
+      ev[4] = (GAMMA-1.0)*Bn / (a*a);
+      ev[5] = (GAMMA-1.0)*Bt / (a*a);
+      ev[6] = (GAMMA-1.0)*Bz / (a*a);
+      ev[7] = (1.0-GAMMA) / (a*a);
+      utils::copy(ev, sys.direction[EP].leigenvector);
     
-    // right eigenvector
-    ev[0] = 1;
-    ev[1] = un;
-    ev[2] = ut;
-    ev[3] = w;
-    ev[4] = 0;
-    ev[5] = 0;
-    ev[6] = 0;
-    ev[7] = (un*un+ut*ut+w*w)/2;
-    copy(ev, sys.direction[EP].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = 1;
+      ev[1] = un;
+      ev[2] = ut;
+      ev[3] = w;
+      ev[4] = 0;
+      ev[5] = 0;
+      ev[6] = 0;
+      ev[7] = (un*un+ut*ut+w*w)/2;
+      utils::copy(ev, sys.direction[EP].reigenvector);
+    }
   
-  { 
-    // Magnetic flux
-    sys.direction[MP].eigenvalue = V.u;
-    ///
-    /// left eigenvector
-    /// ---------------
-    ///
-    ev[0] = 0.0;
-    ev[1] = 0.0;
-    ev[2] = 0.0;
-    ev[3] = 0.0;
-    ev[4] = 1.0;
-    ev[5] = 0.0;
-    ev[6] = 0.0;
-    ev[7] = 0.0;
-    copy(ev, sys.direction[MP].leigenvector);
+    { 
+      // Magnetic flux
+      sys.direction[MP].eigenvalue = V.u;
+      ///
+      /// left eigenvector
+      /// ---------------
+      ///
+      ev[0] = 0.0;
+      ev[1] = 0.0;
+      ev[2] = 0.0;
+      ev[3] = 0.0;
+      ev[4] = 1.0;
+      ev[5] = 0.0;
+      ev[6] = 0.0;
+      ev[7] = 0.0;
+      utils::copy(ev, sys.direction[MP].leigenvector);
     
-    // right eigenvector
-    ev[0] = 0;
-    ev[1] = 0;
-    ev[2] = 0;
-    ev[3] = 0;
-    ev[4] = 1;
-    ev[5] = 0;
-    ev[6] = 0;
-    ev[7] = Bn;
-    copy(ev, sys.direction[MP].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = 0;
+      ev[1] = 0;
+      ev[2] = 0;
+      ev[3] = 0;
+      ev[4] = 1;
+      ev[5] = 0;
+      ev[6] = 0;
+      ev[7] = Bn;
+      utils::copy(ev, sys.direction[MP].reigenvector);
+    }
   
-  { 
-    // Alfven Minus
-    sys.direction[AM].eigenvalue = V.u - ca;
-    // left eigenvector
-    ev[0] = (beta_z*ut/rho - beta_t*w/rho) / sqrt(2);
-    ev[1] = 0;
-    ev[2] = (-beta_z/rho) / sqrt(2);
-    ev[3] = (beta_t/rho) / sqrt(2);
-    ev[4] = 0;
-    ev[5] = -beta_z/ sqrt(2*rho);
-    ev[6] = beta_t / sqrt(2*rho);
-    ev[7] = 0;
-    copy(ev, sys.direction[AM].leigenvector);
+    { 
+      // Alfven Minus
+      sys.direction[AM].eigenvalue = V.u - ca;
+      // left eigenvector
+      ev[0] = (beta_z*ut/rho - beta_t*w/rho) / sqrt(2);
+      ev[1] = 0;
+      ev[2] = (-beta_z/rho) / sqrt(2);
+      ev[3] = (beta_t/rho) / sqrt(2);
+      ev[4] = 0;
+      ev[5] = -beta_z/ sqrt(2*rho);
+      ev[6] = beta_t / sqrt(2*rho);
+      ev[7] = 0;
+      utils::copy(ev, sys.direction[AM].leigenvector);
     
-    // right eigenvector
-    ev[0] = 0;
-    ev[1] = 0;
-    ev[2] = -rho * beta_z / sqrt(2.0);
-    ev[3] = rho * beta_t / sqrt(2.0);
-    ev[4] = 0;
-    ev[5] = - sqrt(rho/2.0) * beta_z;
-    ev[6] = sqrt(rho/2.0) * beta_t;
-    ev[7] = (-rho*ut*beta_z + rho*w*beta_t - Bt*sqrt(rho)*beta_z + Bz*sqrt(rho)*beta_t) / sqrt(2.0);
-    copy(ev, sys.direction[AM].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = 0;
+      ev[1] = 0;
+      ev[2] = -rho * beta_z / sqrt(2.0);
+      ev[3] = rho * beta_t / sqrt(2.0);
+      ev[4] = 0;
+      ev[5] = - sqrt(rho/2.0) * beta_z;
+      ev[6] = sqrt(rho/2.0) * beta_t;
+      ev[7] = (-rho*ut*beta_z + rho*w*beta_t - Bt*sqrt(rho)*beta_z + Bz*sqrt(rho)*beta_t) / sqrt(2.0);
+      utils::copy(ev, sys.direction[AM].reigenvector);
+    }
   
-  { 
-    // Alfven Plus
-    sys.direction[AP].eigenvalue = V.u + ca;
-    // left eigenvector
-    ev[0] = (beta_z*ut/rho - beta_t*w/rho) / sqrt(2);
-    ev[1] = 0;
-    ev[2] = -(beta_z/rho) / sqrt(2);
-    ev[3] = (beta_t/rho) / sqrt(2);
-    ev[4] = 0;
-    ev[5] = beta_z / sqrt(2*rho);
-    ev[6] = - beta_t / sqrt(2*rho);
-    ev[7] = 0;
-    copy(ev, sys.direction[AP].leigenvector);
+    { 
+      // Alfven Plus
+      sys.direction[AP].eigenvalue = V.u + ca;
+      // left eigenvector
+      ev[0] = (beta_z*ut/rho - beta_t*w/rho) / sqrt(2);
+      ev[1] = 0;
+      ev[2] = -(beta_z/rho) / sqrt(2);
+      ev[3] = (beta_t/rho) / sqrt(2);
+      ev[4] = 0;
+      ev[5] = beta_z / sqrt(2*rho);
+      ev[6] = - beta_t / sqrt(2*rho);
+      ev[7] = 0;
+      utils::copy(ev, sys.direction[AP].leigenvector);
     
-    // right eigenvector
-    ev[0] = 0;
-    ev[1] = 0;
-    ev[2] = -rho*beta_z/sqrt(2.0);
-    ev[3] = rho*beta_t/sqrt(2.0);
-    ev[4] = 0;
-    ev[5] = sqrt(rho/2.0)*beta_z;
-    ev[6] = -sqrt(rho/2.0)*beta_t;
-    ev[7] = (-rho*ut*beta_z + rho*w*beta_t + Bt*sqrt(rho)*beta_z - Bz*sqrt(rho)*beta_t) / sqrt(2.0);
-    copy(ev, sys.direction[AP].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = 0;
+      ev[1] = 0;
+      ev[2] = -rho*beta_z/sqrt(2.0);
+      ev[3] = rho*beta_t/sqrt(2.0);
+      ev[4] = 0;
+      ev[5] = sqrt(rho/2.0)*beta_z;
+      ev[6] = -sqrt(rho/2.0)*beta_t;
+      ev[7] = (-rho*ut*beta_z + rho*w*beta_t + Bt*sqrt(rho)*beta_z - Bz*sqrt(rho)*beta_t) / sqrt(2.0);
+      utils::copy(ev, sys.direction[AP].reigenvector);
+    }
   
-  { 
-    // Fast Minus
-    sys.direction[FM].eigenvalue = V.u - cf;
-    // left eigenvector
-    ev[0] = (alpha_f*cf*un/rho - alpha_s*cs*beta_t*sgn(bn)*ut/rho - alpha_s*cs*beta_z*sgn(bn)*w/rho + alpha_f*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
-    ev[1] = (-alpha_f*cf/rho + alpha_f*(1.0-GAMMA)*un/rho) / (2*a*a);
-    ev[2] = (alpha_s*cs*beta_t*sgn(bn)/rho + alpha_f*(1.0-GAMMA)*ut/rho) / (2*a*a);
-    ev[3] = (alpha_s*cs*beta_z*sgn(bn)/rho + alpha_f*(1.0-GAMMA)*w/rho) / (2*a*a);
-    ev[4] = (1.0-GAMMA) * Bn  * alpha_f / (2*rho*a*a);
-    ev[5] = (alpha_s*a*beta_t/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bt/rho) / (2*a*a);
-    ev[6] = (alpha_s*a*beta_z/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bz/rho) / (2*a*a);
-    ev[7] = (alpha_f*(GAMMA-1.0)/rho) / (2*a*a);
-    copy(ev, sys.direction[FM].leigenvector);
+    { 
+      // Fast Minus
+      sys.direction[FM].eigenvalue = V.u - cf;
+      // left eigenvector
+      ev[0] = (alpha_f*cf*un/rho - alpha_s*cs*beta_t*math::sgn(bn)*ut/rho - alpha_s*cs*beta_z*math::sgn(bn)*w/rho + alpha_f*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
+      ev[1] = (-alpha_f*cf/rho + alpha_f*(1.0-GAMMA)*un/rho) / (2*a*a);
+      ev[2] = (alpha_s*cs*beta_t*math::sgn(bn)/rho + alpha_f*(1.0-GAMMA)*ut/rho) / (2*a*a);
+      ev[3] = (alpha_s*cs*beta_z*math::sgn(bn)/rho + alpha_f*(1.0-GAMMA)*w/rho) / (2*a*a);
+      ev[4] = (1.0-GAMMA) * Bn  * alpha_f / (2*rho*a*a);
+      ev[5] = (alpha_s*a*beta_t/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bt/rho) / (2*a*a);
+      ev[6] = (alpha_s*a*beta_z/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bz/rho) / (2*a*a);
+      ev[7] = (alpha_f*(GAMMA-1.0)/rho) / (2*a*a);
+      utils::copy(ev, sys.direction[FM].leigenvector);
     
-    // right eigenvector
-    ev[0] = alpha_f*rho;
-    ev[1] = un*alpha_f*rho - rho*alpha_f*cf;
-    ev[2] = ut*alpha_f*rho + rho*alpha_s*cs*beta_t*sgn(bn);
-    ev[3] = w*alpha_f*rho + rho*alpha_s*cs*beta_z*sgn(bn);
-    ev[4] = 0;
-    ev[5] = alpha_s*sqrt(rho)*a*beta_t;
-    ev[6] = alpha_s*sqrt(rho)*a*beta_z;
-    ev[7] = alpha_f*rho*(un*un+ut*ut+w*w)/2 - rho*un*alpha_f*cf + rho*ut*alpha_s*cs*beta_t*sgn(bn) + rho*w*alpha_s*cs*beta_z*sgn(bn) + Bt*alpha_s*sqrt(rho)*a*beta_t + Bz*alpha_s*sqrt(rho)*a*beta_z + alpha_f*rho*a*a/(GAMMA-1.0);
-    copy(ev, sys.direction[FM].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = alpha_f*rho;
+      ev[1] = un*alpha_f*rho - rho*alpha_f*cf;
+      ev[2] = ut*alpha_f*rho + rho*alpha_s*cs*beta_t*math::sgn(bn);
+      ev[3] = w*alpha_f*rho + rho*alpha_s*cs*beta_z*math::sgn(bn);
+      ev[4] = 0;
+      ev[5] = alpha_s*sqrt(rho)*a*beta_t;
+      ev[6] = alpha_s*sqrt(rho)*a*beta_z;
+      ev[7] = alpha_f*rho*(un*un+ut*ut+w*w)/2 - rho*un*alpha_f*cf + rho*ut*alpha_s*cs*beta_t*math::sgn(bn) + rho*w*alpha_s*cs*beta_z*math::sgn(bn) + Bt*alpha_s*sqrt(rho)*a*beta_t + Bz*alpha_s*sqrt(rho)*a*beta_z + alpha_f*rho*a*a/(GAMMA-1.0);
+      utils::copy(ev, sys.direction[FM].reigenvector);
+    }
   
-  { 
-    // Fast Plus
-    sys.direction[FP].eigenvalue = V.u + cf;
-    // left eigenvector
-    ev[0] = (-alpha_f*cf*un/rho + alpha_s*cs*beta_t*sgn(bn)*ut/rho + alpha_s*cs*beta_z*sgn(bn)*w/rho + alpha_f*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
-    ev[1] = (alpha_f*cf/rho + alpha_f*(1.0-GAMMA)*un/rho) / (2*a*a);
-    ev[2] = (-alpha_s*cs*beta_t*sgn(bn)/rho + alpha_f*(1.0-GAMMA)*ut/rho) / (2*a*a);
-    ev[3] = (-alpha_s*cs*beta_z*sgn(bn)/rho + alpha_f*(1.0-GAMMA)*w/rho) / (2*a*a);
-    ev[4] = (1.0-GAMMA) * Bn  * alpha_f / (2*rho*a*a);
-    ev[5] = (alpha_s*a*beta_t/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bt/rho) / (2*a*a);
-    ev[6] = (alpha_s*a*beta_z/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bz/rho) / (2*a*a);
-    ev[7] = (alpha_f*(GAMMA-1.0)/rho) / (2*a*a);
-    copy(ev, sys.direction[FP].leigenvector);
+    { 
+      // Fast Plus
+      sys.direction[FP].eigenvalue = V.u + cf;
+      // left eigenvector
+      ev[0] = (-alpha_f*cf*un/rho + alpha_s*cs*beta_t*math::sgn(bn)*ut/rho + alpha_s*cs*beta_z*math::sgn(bn)*w/rho + alpha_f*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
+      ev[1] = (alpha_f*cf/rho + alpha_f*(1.0-GAMMA)*un/rho) / (2*a*a);
+      ev[2] = (-alpha_s*cs*beta_t*math::sgn(bn)/rho + alpha_f*(1.0-GAMMA)*ut/rho) / (2*a*a);
+      ev[3] = (-alpha_s*cs*beta_z*math::sgn(bn)/rho + alpha_f*(1.0-GAMMA)*w/rho) / (2*a*a);
+      ev[4] = (1.0-GAMMA) * Bn  * alpha_f / (2*rho*a*a);
+      ev[5] = (alpha_s*a*beta_t/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bt/rho) / (2*a*a);
+      ev[6] = (alpha_s*a*beta_z/sqrt(rho) + alpha_f*(1.0-GAMMA)*Bz/rho) / (2*a*a);
+      ev[7] = (alpha_f*(GAMMA-1.0)/rho) / (2*a*a);
+      utils::copy(ev, sys.direction[FP].leigenvector);
     
-    // right eigenvector
-    ev[0] = alpha_f*rho;
-    ev[1] = un*alpha_f*rho + rho*alpha_f*cf;
-    ev[2] = ut*alpha_f*rho - rho*alpha_s*cs*beta_t*sgn(bn);
-    ev[3] = w*alpha_f*rho - rho*alpha_s*cs*beta_z*sgn(bn);
-    ev[4] = 0;
-    ev[5] = alpha_s*sqrt(rho)*a*beta_t;
-    ev[6] = alpha_s*sqrt(rho)*a*beta_z;
-    ev[7] = alpha_f*rho*(un*un+ut*ut+w*w)/2 + rho*un*alpha_f*cf - rho*ut*alpha_s*cs*beta_t*sgn(bn) - rho*w*alpha_s*cs*beta_z*sgn(bn) + Bt*alpha_s*sqrt(rho)*a*beta_t + Bz*alpha_s*sqrt(rho)*a*beta_z + alpha_f*rho*a*a/(GAMMA-1.0);
-
-    copy(ev, sys.direction[FP].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = alpha_f*rho;
+      ev[1] = un*alpha_f*rho + rho*alpha_f*cf;
+      ev[2] = ut*alpha_f*rho - rho*alpha_s*cs*beta_t*math::sgn(bn);
+      ev[3] = w*alpha_f*rho - rho*alpha_s*cs*beta_z*math::sgn(bn);
+      ev[4] = 0;
+      ev[5] = alpha_s*sqrt(rho)*a*beta_t;
+      ev[6] = alpha_s*sqrt(rho)*a*beta_z;
+      ev[7] = alpha_f*rho*(un*un+ut*ut+w*w)/2 + rho*un*alpha_f*cf - rho*ut*alpha_s*cs*beta_t*math::sgn(bn) - rho*w*alpha_s*cs*beta_z*math::sgn(bn) + Bt*alpha_s*sqrt(rho)*a*beta_t + Bz*alpha_s*sqrt(rho)*a*beta_z + alpha_f*rho*a*a/(GAMMA-1.0);
+      utils::copy(ev, sys.direction[FP].reigenvector);
+    }
   
-  { 
-    // Slow minus
-    sys.direction[SM].eigenvalue = V.u - cs;
-    // left eigenvector
-    ev[0] = (alpha_s*cs*un/rho + alpha_f*cf*beta_t*sgn(bn)*ut/rho + alpha_f*cf*beta_z*sgn(bn)*w/rho + alpha_s*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
-    ev[1] = (-alpha_s*cs/rho + alpha_s*(1.0-GAMMA)*un/rho) / (2*a*a);
-    ev[2] = (-alpha_f*cf*beta_t*sgn(bn)/rho + alpha_s*(1.0-GAMMA)*ut/rho) / (2*a*a);
-    ev[3] = (-alpha_f*cf*beta_z*sgn(bn)/rho + alpha_s*(1.0-GAMMA)*w/rho) / (2*a*a);
-    ev[4] = (1.0-GAMMA) * Bn  * alpha_s / (2*rho*a*a);
-    ev[5] = (-alpha_f*a*beta_t/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bt/rho) / (2*a*a);
-    ev[6] = (-alpha_f*a*beta_z/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bz/rho) / (2*a*a);
-    ev[7] = (alpha_s*(GAMMA-1.0)/rho) / (2*a*a);
-    copy(ev, sys.direction[SM].leigenvector);
+    { 
+      // Slow minus
+      sys.direction[SM].eigenvalue = V.u - cs;
+      // left eigenvector
+      ev[0] = (alpha_s*cs*un/rho + alpha_f*cf*beta_t*math::sgn(bn)*ut/rho + alpha_f*cf*beta_z*math::sgn(bn)*w/rho + alpha_s*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
+      ev[1] = (-alpha_s*cs/rho + alpha_s*(1.0-GAMMA)*un/rho) / (2*a*a);
+      ev[2] = (-alpha_f*cf*beta_t*math::sgn(bn)/rho + alpha_s*(1.0-GAMMA)*ut/rho) / (2*a*a);
+      ev[3] = (-alpha_f*cf*beta_z*math::sgn(bn)/rho + alpha_s*(1.0-GAMMA)*w/rho) / (2*a*a);
+      ev[4] = (1.0-GAMMA) * Bn  * alpha_s / (2*rho*a*a);
+      ev[5] = (-alpha_f*a*beta_t/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bt/rho) / (2*a*a);
+      ev[6] = (-alpha_f*a*beta_z/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bz/rho) / (2*a*a);
+      ev[7] = (alpha_s*(GAMMA-1.0)/rho) / (2*a*a);
+      utils::copy(ev, sys.direction[SM].leigenvector);
     
-    // right eigenvector
-    ev[0] = alpha_s*rho;
-    ev[1] = un*alpha_s*rho - alpha_s*cs*rho;
-    ev[2] = ut*alpha_s*rho - rho*alpha_f*cf*beta_t*sgn(bn);
-    ev[3] = w*alpha_s*rho - rho*alpha_f*cf*beta_z*sgn(bn);
-    ev[4] = 0;
-    ev[5] = -alpha_f*sqrt(rho)*a*beta_t;
-    ev[6] = -alpha_f*sqrt(rho)*a*beta_z;
-    ev[7] = alpha_s*rho*(un*un+ut*ut+w*w)/2 - rho*un*alpha_s*cs - rho*ut*alpha_f*cf*beta_t*sgn(bn) - rho*w*alpha_f*cf*beta_z*sgn(bn) - Bt*alpha_f*sqrt(rho)*a*beta_t - Bz*alpha_f*sqrt(rho)*a*beta_z + alpha_s*rho*a*a/(GAMMA-1.0);
-    copy(ev, sys.direction[SM].reigenvector);
-  }
-  {
+      // right eigenvector
+      ev[0] = alpha_s*rho;
+      ev[1] = un*alpha_s*rho - alpha_s*cs*rho;
+      ev[2] = ut*alpha_s*rho - rho*alpha_f*cf*beta_t*math::sgn(bn);
+      ev[3] = w*alpha_s*rho - rho*alpha_f*cf*beta_z*math::sgn(bn);
+      ev[4] = 0;
+      ev[5] = -alpha_f*sqrt(rho)*a*beta_t;
+      ev[6] = -alpha_f*sqrt(rho)*a*beta_z;
+      ev[7] = alpha_s*rho*(un*un+ut*ut+w*w)/2 - rho*un*alpha_s*cs - rho*ut*alpha_f*cf*beta_t*math::sgn(bn) - rho*w*alpha_f*cf*beta_z*math::sgn(bn) - Bt*alpha_f*sqrt(rho)*a*beta_t - Bz*alpha_f*sqrt(rho)*a*beta_z + alpha_s*rho*a*a/(GAMMA-1.0);
+      utils::copy(ev, sys.direction[SM].reigenvector);
+    }
+    {
  
-    // Slow plus
-    sys.direction[SP].eigenvalue = V.u + cs;
-    // left eigenvector
-    ev[0] = (-alpha_s*cs*un/rho - alpha_f*cf*beta_t*sgn(bn)*ut/rho - alpha_f*cf*beta_z*sgn(bn)*w/rho + alpha_s*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
-    ev[1] = (alpha_s*cs/rho + alpha_s*(1.0-GAMMA)*un/rho) / (2*a*a);
-    ev[2] = (alpha_f*cf*beta_t*sgn(bn)/rho + alpha_s*(1.0-GAMMA)*ut/rho) / (2*a*a);
-    ev[3] = (alpha_f*cf*beta_z*sgn(bn)/rho + alpha_s*(1.0-GAMMA)*w/rho) / (2*a*a);
-    ev[4] = (1.0-GAMMA) * Bn  * alpha_s / (2*rho*a*a);
-    ev[5] = (-alpha_f*a*beta_t/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bt/rho) / (2*a*a);
-    ev[6] = (-alpha_f*a*beta_z/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bz/rho) / (2*a*a);
-    ev[7] = (alpha_s*(GAMMA-1.0)/rho) / (2*a*a);
-    copy(ev, sys.direction[SP].leigenvector);
+      // Slow plus
+      sys.direction[SP].eigenvalue = V.u + cs;
+      // left eigenvector
+      ev[0] = (-alpha_s*cs*un/rho - alpha_f*cf*beta_t*math::sgn(bn)*ut/rho - alpha_f*cf*beta_z*math::sgn(bn)*w/rho + alpha_s*(GAMMA-1.0)*(un*un+ut*ut+w*w)/(2*rho)) / (2*a*a);
+      ev[1] = (alpha_s*cs/rho + alpha_s*(1.0-GAMMA)*un/rho) / (2*a*a);
+      ev[2] = (alpha_f*cf*beta_t*math::sgn(bn)/rho + alpha_s*(1.0-GAMMA)*ut/rho) / (2*a*a);
+      ev[3] = (alpha_f*cf*beta_z*math::sgn(bn)/rho + alpha_s*(1.0-GAMMA)*w/rho) / (2*a*a);
+      ev[4] = (1.0-GAMMA) * Bn  * alpha_s / (2*rho*a*a);
+      ev[5] = (-alpha_f*a*beta_t/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bt/rho) / (2*a*a);
+      ev[6] = (-alpha_f*a*beta_z/sqrt(rho) + alpha_s*(1.0-GAMMA)*Bz/rho) / (2*a*a);
+      ev[7] = (alpha_s*(GAMMA-1.0)/rho) / (2*a*a);
+      utils::copy(ev, sys.direction[SP].leigenvector);
     
-    // right eigenvector
-    ev[0] = alpha_s*rho;
-    ev[1] = un*alpha_s*rho + alpha_s*cs*rho;
-    ev[2] = ut*alpha_s*rho + rho*alpha_f*cf*beta_t*sgn(bn);
-    ev[3] = w*alpha_s*rho + rho*alpha_f*cf*beta_z*sgn(bn);
-    ev[4] = 0;
-    ev[5] = -alpha_f*sqrt(rho)*a*beta_t;
-    ev[6] = -alpha_f*sqrt(rho)*a*beta_z;
-    ev[7] = alpha_s*rho*(un*un+ut*ut+w*w)/2 + rho*un*alpha_s*cs + rho*ut*alpha_f*cf*beta_t*sgn(bn) + rho*w*alpha_f*cf*beta_z*sgn(bn) - Bt*alpha_f*sqrt(rho)*a*beta_t - Bz*alpha_f*sqrt(rho)*a*beta_z + alpha_s*rho*a*a/(GAMMA-1.0);
-    copy(ev, sys.direction[SP].reigenvector);
-  }
+      // right eigenvector
+      ev[0] = alpha_s*rho;
+      ev[1] = un*alpha_s*rho + alpha_s*cs*rho;
+      ev[2] = ut*alpha_s*rho + rho*alpha_f*cf*beta_t*math::sgn(bn);
+      ev[3] = w*alpha_s*rho + rho*alpha_f*cf*beta_z*math::sgn(bn);
+      ev[4] = 0;
+      ev[5] = -alpha_f*sqrt(rho)*a*beta_t;
+      ev[6] = -alpha_f*sqrt(rho)*a*beta_z;
+      ev[7] = alpha_s*rho*(un*un+ut*ut+w*w)/2 + rho*un*alpha_s*cs + rho*ut*alpha_f*cf*beta_t*math::sgn(bn) + rho*w*alpha_f*cf*beta_z*math::sgn(bn) - Bt*alpha_f*sqrt(rho)*a*beta_t - Bz*alpha_f*sqrt(rho)*a*beta_z + alpha_s*rho*a*a/(GAMMA-1.0);
+      utils::copy(ev, sys.direction[SP].reigenvector);
+    }
   
   
-  vector l, r;
-  for(int i=0;i<8;i++){
-    copy(sys.direction[i].leigenvector, l);
-    copy(sys.direction[i].reigenvector, r);
-    sys.direction[i].leigenvector[1] = l[1]*normal.x - l[2]*normal.y;
-    sys.direction[i].leigenvector[2] = l[1]*normal.y + l[2]*normal.x;
-    sys.direction[i].leigenvector[4] = l[4]*normal.x - l[5]*normal.y;
-    sys.direction[i].leigenvector[5] = l[4]*normal.y + l[5]*normal.x;
-    sys.direction[i].reigenvector[1] = r[1]*normal.x - r[2]*normal.y;
-    sys.direction[i].reigenvector[2] = r[1]*normal.y + r[2]*normal.x;
-    sys.direction[i].reigenvector[4] = r[4]*normal.x - r[5]*normal.y;
-    sys.direction[i].reigenvector[5] = r[4]*normal.y + r[5]*normal.x;
+    vector l, r;
+    for(int i=0;i<8;i++){
+      utils::copy(sys.direction[i].leigenvector, l);
+      utils::copy(sys.direction[i].reigenvector, r);
+      sys.direction[i].leigenvector[1] = l[1]*normal.x - l[2]*normal.y;
+      sys.direction[i].leigenvector[2] = l[1]*normal.y + l[2]*normal.x;
+      sys.direction[i].leigenvector[4] = l[4]*normal.x - l[5]*normal.y;
+      sys.direction[i].leigenvector[5] = l[4]*normal.y + l[5]*normal.x;
+      sys.direction[i].reigenvector[1] = r[1]*normal.x - r[2]*normal.y;
+      sys.direction[i].reigenvector[2] = r[1]*normal.y + r[2]*normal.x;
+      sys.direction[i].reigenvector[4] = r[4]*normal.x - r[5]*normal.y;
+      sys.direction[i].reigenvector[5] = r[4]*normal.y + r[5]*normal.x;
     
-  }
+    }
 
   	
-  // eigen matrices
-  for(int i=0;i<8;i++){
-    for(int j=0;j<8;j++){
-      sys.L[i][j] = sys.direction[i].leigenvector[j];
-      sys.R[j][i] = sys.direction[i].reigenvector[j];
+    // eigen matrices
+    for(int i=0;i<8;i++){
+      for(int j=0;j<8;j++){
+	sys.L[i][j] = sys.direction[i].leigenvector[j];
+	sys.R[j][i] = sys.direction[i].reigenvector[j];
+      }
+    }
+    return sys;
+  
+  }
+
+  void f(cvariables U, vector F){
+    double rho, u, v, w, Bx, By, Bz, p, E;
+    rho = U.rho;
+    u = U.rhou/rho;
+    v = U.rhov/rho;
+    w = U.rhow/rho;
+    Bx = U.Bx;
+    By = U.By;
+    Bz = U.Bz;
+    E = U.E;
+    p = (GAMMA-1.0)*(E - rho*(u*u + v*v + w*w)/2 - (Bx*Bx + By*By + Bz*Bz)/2);
+    F[0] = rho*u;
+    F[1] = rho*u*u + p + (Bx*Bx + By*By + Bz*Bz)/2 - Bx*Bx;
+    F[2] = rho*u*v - By*Bx;
+    F[3] = rho*u*w - Bz*Bx;
+    F[4] = 0;
+    F[5] = u*By - v*Bx;
+    F[6] = u*Bz - w*Bx;
+    F[7] = (E + p + (Bx*Bx + By*By + Bz*Bz)/2) * u - Bx * (u*Bx + v*By + w*Bz);
+  }
+
+  //Function to return the flux along Y-direction g(U)
+  //for given state U
+  void g(cvariables U, vector G){
+    double rho, u, v, w, Bx, By, Bz, p, E;
+    rho = U.rho;
+    u = U.rhou/rho;
+    v = U.rhov/rho;
+    w = U.rhow/rho;
+    Bx = U.Bx;
+    By = U.By;
+    Bz = U.Bz;
+    E = U.E;
+    p = (GAMMA-1.0)*(E - rho*(u*u + v*v + w*w)/2 - (Bx*Bx + By*By + Bz*Bz)/2);
+    G[0] = rho*v;
+    G[1] = rho*u*v - By*Bx;
+    G[2] = rho*v*v + p + (Bx*Bx + By*By + Bz*Bz)/2 - By*By;
+    G[3] = rho*v*w - Bz*By;
+    G[4] = v*Bx - u*By;
+    G[5] = 0;
+    G[6] = v*Bz - w*By;
+    G[7] = (E + p + (Bx*Bx + By*By + Bz*Bz)/2)*v - By*(u*Bx + v*By + w*Bz);
+  }
+
+  void flux(cvariables U, point normal, vector flx){
+    vector F, G;
+    f(U, F);
+    g(U, G);
+    for (int k = 0; k < 8; k++){
+      flx[k] = normal.x*F[k] + normal.y*G[k];
     }
   }
-  return sys;
-  
 }
-
-void f(cvariables U, vector F){
-  double rho, u, v, w, Bx, By, Bz, p, E;
-  rho = U.rho;
-  u = U.rhou/rho;
-  v = U.rhov/rho;
-  w = U.rhow/rho;
-  Bx = U.Bx;
-  By = U.By;
-  Bz = U.Bz;
-  E = U.E;
-  p = (GAMMA-1.0)*(E - rho*(u*u + v*v + w*w)/2 - (Bx*Bx + By*By + Bz*Bz)/2);
-  F[0] = rho*u;
-  F[1] = rho*u*u + p + (Bx*Bx + By*By + Bz*Bz)/2 - Bx*Bx;
-  F[2] = rho*u*v - By*Bx;
-  F[3] = rho*u*w - Bz*Bx;
-  F[4] = 0;
-  F[5] = u*By - v*Bx;
-  F[6] = u*Bz - w*Bx;
-  F[7] = (E + p + (Bx*Bx + By*By + Bz*Bz)/2) * u - Bx * (u*Bx + v*By + w*Bz);
-}
-
-//Function to return the flux along Y-direction g(U)
-//for given state U
-void g(cvariables U, vector G){
-  double rho, u, v, w, Bx, By, Bz, p, E;
-  rho = U.rho;
-  u = U.rhou/rho;
-  v = U.rhov/rho;
-  w = U.rhow/rho;
-  Bx = U.Bx;
-  By = U.By;
-  Bz = U.Bz;
-  E = U.E;
-  p = (GAMMA-1.0)*(E - rho*(u*u + v*v + w*w)/2 - (Bx*Bx + By*By + Bz*Bz)/2);
-  G[0] = rho*v;
-  G[1] = rho*u*v - By*Bx;
-  G[2] = rho*v*v + p + (Bx*Bx + By*By + Bz*Bz)/2 - By*By;
-  G[3] = rho*v*w - Bz*By;
-  G[4] = v*Bx - u*By;
-  G[5] = 0;
-  G[6] = v*Bz - w*By;
-  G[7] = (E + p + (Bx*Bx + By*By + Bz*Bz)/2)*v - By*(u*Bx + v*By + w*Bz);
-}
-
-void flux(cvariables U, point normal, vector flx){
-  vector F, G;
-  f(U, F);
-  g(U, G);
-  for (int k = 0; k < 8; k++){
-    flx[k] = normal.x*F[k] + normal.y*G[k];
-  }
-}
-
 
 #endif

@@ -7,3 +7,7 @@
 #include "./utils/include.halo"
 #include "./geometry/include.halo"
 #include "./solver/include.halo"
+using namespace geo;
+using namespace math;
+using namespace utils;
+using namespace mhd;

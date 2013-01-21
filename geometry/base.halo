@@ -94,7 +94,7 @@ void Domain::set_vertex(int i, int j){
 }
 
 void Domain::calc_area(int i, int j){
-  cell[i][j].area = area(cell[i][j]);
+  cell[i][j].area = geo::area(cell[i][j]);
 }
 
 void Domain::calc_centroid(int i, int j){
@@ -108,10 +108,10 @@ void Domain::calc_centroid(int i, int j){
 }
 
 void Domain::calc_facelength(int i, int j){
-  cell[i][j].facelength[0] = distance(cell[i][j].vertex[0], cell[i][j].vertex[1]);
-  cell[i][j].facelength[1] = distance(cell[i][j].vertex[1], cell[i][j].vertex[2]);
-  cell[i][j].facelength[2] = distance(cell[i][j].vertex[2], cell[i][j].vertex[3]);
-  cell[i][j].facelength[3] = distance(cell[i][j].vertex[3], cell[i][j].vertex[0]);
+  cell[i][j].facelength[0] = geo::distance(cell[i][j].vertex[0], cell[i][j].vertex[1]);
+  cell[i][j].facelength[1] = geo::distance(cell[i][j].vertex[1], cell[i][j].vertex[2]);
+  cell[i][j].facelength[2] = geo::distance(cell[i][j].vertex[2], cell[i][j].vertex[3]);
+  cell[i][j].facelength[3] = geo::distance(cell[i][j].vertex[3], cell[i][j].vertex[0]);
 }
 
 void Domain::calc_normal(int i, int j){
@@ -136,7 +136,7 @@ void Domain::calc_normal(int i, int j){
       tn.y = -(x[i][j] - x[i][j+1]);
       break;
     };
-    mag = magnitute(tn);
+    mag = geo::distance(tn);
     cell[i][j].normal[k].x = tn.x/mag;
     cell[i][j].normal[k].y = tn.y/mag;
   }
