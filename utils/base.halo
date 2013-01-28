@@ -34,33 +34,31 @@ namespace utils{
     }
   }
  
-  void copy(double *source, double *dest){
-    for(int i=0;i<10;i++){
-      dest[i] = source[i];
-    }
-  }
-  
 
-  void convert(cvariables a, vector b){
-    b[0] = a.rho;
-    b[1] = a.rhou;
-    b[2] = a.rhov;
-    b[3] = a.rhow;
-    b[4] = a.Bx;
-    b[5] = a.By;
-    b[6] = a.Bz;
-    b[7] = a.E;
+  vector convert(cvariables a){
+    vector b;
+    b.v[0] = a.rho;
+    b.v[1] = a.rhou;
+    b.v[2] = a.rhov;
+    b.v[3] = a.rhow;
+    b.v[4] = a.Bx;
+    b.v[5] = a.By;
+    b.v[6] = a.Bz;
+    b.v[7] = a.E;
+    return b;
   } 
   
-  void convert(vector a, cvariables b){
-    b.rho = a[0];
-    b.rhou = a[1];
-    b.rhov = a[2];
-    b.rhow = a[3];
-    b.Bx = a[4];
-    b.By = a[5];
-    b.Bz = a[6];
-    b.E = a[7];
+  cvariables convert(vector a){
+    cvariables b;
+    b.rho = a.v[0];
+    b.rhou = a.v[1];
+    b.rhov = a.v[2];
+    b.rhow = a.v[3];
+    b.Bx = a.v[4];
+    b.By = a.v[5];
+    b.Bz = a.v[6];
+    b.E = a.v[7];
+    return b;
   }
   
 
@@ -81,28 +79,20 @@ namespace math{
     return x < 0 ? -x:x;
   }
 
+  double max(double a, double b){
+    return a < b ? b:a;
+  }
+  double min(double a, double b){
+    return a < b ? a:b;
+  }
+
   double average(double a, double b){
     return 0.5*(a + b);
   }
   
-
-  void mult(matrix A, vector b, vector c){
-    for(int i=0;i<8;i++){
-      c[i] = 0.0;
-      for(int j=0;j<8;j++){
-	c[i] += A[i][j]*b[j];
-      }
-    }
-}
   
-  void mult(vector b, matrix A, vector c){
-    for(int i=0;i<8;i++){
-      c[i] = 0.0;
-      for(int j=0;j<8;j++){
-      c[i] += A[j][i]*b[j];
-      }
-    }
-  }
+  
+  
 }
  
 #endif

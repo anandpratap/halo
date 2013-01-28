@@ -5,8 +5,8 @@
 #include <fstream>
 #include <iostream>
 
-#define MAX_NX 50
-#define MAX_NY 50
+#define MAX_NX 1000
+#define MAX_NY 1000
 #define BOUNDARY_CELL 2
 #define SIDE 1.0
 #define PI 3.14
@@ -144,14 +144,26 @@ void Domain::calc_normal(int i, int j){
 
 
 void Domain::init(int i, int j){
-  cell[i][j].state.u = 1.0;
-  cell[i][j].state.v = 1.0;
-  cell[i][j].state.p = 1.0;
-  cell[i][j].state.rho = 1.0;
-  cell[i][j].state.Bx = 0.0;
-  cell[i][j].state.By = 0.0;
-  cell[i][j].state.Bz = 0.0;
-  cell[i][j].state.w = 1.0;
+  if (sqrt(math::sqr(cell[i][j].centroid.x-0.5) + math::sqr(cell[i][j].centroid.y-0.5)) < 0.2){ 
+    cell[i][j].cstate.rho = 1.0;
+    cell[i][j].cstate.rhou = 0.0;
+    cell[i][j].cstate.rhov = 0.0;
+    cell[i][j].cstate.rhow = 0.0;
+    cell[i][j].cstate.Bx = 0.0;
+    cell[i][j].cstate.By = 0.0;
+    cell[i][j].cstate.Bz = 0.0;
+    cell[i][j].cstate.E = 0.714;
+  }
+  else{
+    cell[i][j].cstate.rho = 1.0;
+    cell[i][j].cstate.rhou = 0.0;
+    cell[i][j].cstate.rhov = 0.0;
+    cell[i][j].cstate.rhow = 0.0;
+    cell[i][j].cstate.Bx = 0.0;
+    cell[i][j].cstate.By = 0.0;
+    cell[i][j].cstate.Bz = 0.0;
+    cell[i][j].cstate.E = 0.714;
+  }
 }
 
 void Domain::write_grid_file(void){
@@ -166,6 +178,7 @@ void Domain::write_grid_file(void){
 }
 
 void Domain::write_domain_file(void){
+  std::cout<<"Writing domain file"<<std::endl;
   std::ofstream domain("domain.dat");
   domain.precision(15);
   for(int i=0;i<Nx;i++){
@@ -174,14 +187,14 @@ void Domain::write_domain_file(void){
       for(int k=0;k<4;k++){
 	domain<<cell[i][j].normal[k].x<<" "<<cell[i][j].normal[k].y<<" ";
       }
-      domain<<cell[i][j].state.rho<<" ";
-      domain<<cell[i][j].state.u<<" ";
-      domain<<cell[i][j].state.v<<" ";
-      domain<<cell[i][j].state.w<<" ";
-      domain<<cell[i][j].state.Bx<<" ";
-      domain<<cell[i][j].state.By<<" ";
-      domain<<cell[i][j].state.Bz<<" ";
-      domain<<cell[i][j].state.p<<" ";
+      domain<<cell[i][j].cstate.rho<<" ";
+      domain<<cell[i][j].cstate.rhou<<" ";
+      domain<<cell[i][j].cstate.rhov<<" ";
+      domain<<cell[i][j].cstate.rhow<<" ";
+      domain<<cell[i][j].cstate.Bx<<" ";
+      domain<<cell[i][j].cstate.By<<" ";
+      domain<<cell[i][j].cstate.Bz<<" ";
+      domain<<cell[i][j].cstate.E<<" ";
       
       domain<<"\n";
     }

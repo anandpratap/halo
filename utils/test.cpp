@@ -13,18 +13,7 @@ void testAverage(void){
 
 }
 
-void testCopy(void){
-  // copy x into y and then check elements of y
-  double x[10];
-  for(int i=0; i<10;i++){
-    x[i] = i*i;
-  }
-  double y[10];
-  copy(x, y);
-  for(int i=0; i<10;i++){
-    assert(y[i]==i*i);
-  }
-}
+
 
 void testSgn(void){
   assert(sgn(-19)==-1);
@@ -32,9 +21,38 @@ void testSgn(void){
   assert(sgn(0)==1);
 }
 
+void testOperator(void){
+  vector a, b;
+  for(int i=0; i<8;i++){
+    double theta = (i + 0.01)/32.0;
+    a.v[i] = tan(theta)*tan(theta);
+    b.v[i] = 1/(cos(theta)*cos(theta));
+  }
+  vector c;
+  c = b - a;
+  for(int i=0;i<8;i++){
+    assert((c.v[i]-1) < .000000001);
+  }
+
+  matrix d;
+  for(int i=0;i<8;i++){
+    for(int j=0;j<8;j++){
+      d.m[i][j] = i+j;
+    }
+  }
+  for(int i=0;i<8;i++){
+    c.v[i] = 1.0;
+  }
+  vector e;
+  e = d*c;
+  for(int i=0;i<8;i++){
+    cout<<e.v[i]<<"\n";
+  }
+}
+
 int main(){
   testAverage();
-  testCopy();
+  testOperator();
   testSgn();
   return 0;
 }

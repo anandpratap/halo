@@ -1,0 +1,7 @@
+#ifndef SOLVER_DEFN_HALO
+#define SOLVER_DEFN_HALO
+
+#define FREESTREAM 0
+#define OUTFLOW 1
+
+#endif

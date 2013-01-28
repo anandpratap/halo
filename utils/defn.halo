@@ -10,8 +10,51 @@
 #define SM 6
 #define SP 7
 
-typedef double vector [8];
-typedef double matrix [8][8];
+struct vector;
+struct matrix;
+
+struct vector{
+  double v[8];
+  
+  vector operator-(const vector a){
+    vector o;
+    for(int i=0;i<8;i++){
+      o.v[i] = v[i] - a.v[i];
+    }
+    return o;
+  }
+
+  vector operator*(const matrix A){
+    vector c;
+    for(int i=0;i<8;i++){
+      c.v[i] = 0.0;
+      for(int j=0;j<8;j++){
+	c.v[i] += A.m[j][i]*v[j];
+      }
+    }
+    return c;
+  }
+  
+};
+
+
+
+struct matrix{
+  double m[8][8];
+  
+  vector operator*(const vector a){
+    vector c;
+    for(int i=0;i<8;i++){
+      c.v[i] = 0.0;
+      for(int j=0;j<8;j++){
+	c.v[i] += m[i][j]*a.v[j];
+      }
+    }
+    return c;
+  }
+
+};
+
 struct point{
   double x, y;
 };
@@ -37,7 +80,7 @@ struct cvariables{
 };
 
 struct scell{
-  variables state;
+  cvariables cstate;
   point centroid;
   point normal[4];
   double facelength[4];

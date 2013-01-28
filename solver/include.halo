@@ -1,7 +1,7 @@
 #ifndef SOLVER_INCLUDE_HALO
 #define SOLVER_INCLUDE_HALO
 #include "base.halo"
-
+#include "defn.halo"
 
 
 #endif 

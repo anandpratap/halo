@@ -1,2 +1,2 @@
 #define DEBUG 1
-#define SMALL 0.000000001
+#define SMALL 0.001
